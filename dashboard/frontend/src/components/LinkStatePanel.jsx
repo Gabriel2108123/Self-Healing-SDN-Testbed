@@ -9,13 +9,26 @@
 
 import React from 'react';
 
+// Backend sends port-qualified names like "s1:p2-s2:p2".
+// Strip port info so they match the simple "s1-s2" format used in DEFAULT_LINKS.
+function normalizeLink(link) {
+  const parts = (link || '').split('-');
+  if (parts.length < 2) return link;
+  const a = parts[0].split(':')[0];
+  const b = parts[1].split(':')[0];
+  return `${a}-${b}`;
+}
+
 // Default link list so the table always has rows even if no monitor log data
 const DEFAULT_LINKS = ['h1-s1', 's1-s2', 's1-s3', 's3-s2', 's2-h2'];
 
 export default function LinkStatePanel({ linkStates = [] }) {
-  // Build a map from link name → state
+  // Build a map from normalised link name → state entry
   const stateMap = {};
-  linkStates.forEach(ls => { stateMap[ls.link] = ls; });
+  linkStates.forEach(ls => {
+    const key = normalizeLink(ls.link);
+    stateMap[key] = { ...ls, link: key };
+  });
 
   // Merge with defaults so all links are always shown
   const rows = DEFAULT_LINKS.map(link => {

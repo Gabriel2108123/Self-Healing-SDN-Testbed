@@ -40,21 +40,28 @@ const IconEvents      = () => (<svg viewBox="0 0 24 24" fill="none" stroke="curr
 function ctrlInfo(s) { return s === 'active' ? { label:'Active', st:'ok' } : s === 'degraded' ? { label:'Degraded', st:'warning' } : { label:'Unknown', st:'info' }; }
 function connInfo(c) { return c === 'connected' ? { label:'Connected', st:'ok' } : c === 'degraded' ? { label:'Degraded', st:'error' } : { label:'Unknown', st:'info' }; }
 
+// Normalize port-qualified backend link names (e.g. "s1:p2-s2:p2") to "s1-s2"
+function normalizeLinkName(link) {
+  const parts = (link || '').split('-');
+  if (parts.length < 2) return link;
+  return `${parts[0].split(':')[0]}-${parts[1].split(':')[0]}`;
+}
+
 // ── Build topology nodes/links from dashboard data for the D3 graph ─────────
 function buildTopoFromDash(topology, dashboard) {
   if (!topology) return { nodes: [], links: [], activePath: [] };
 
   // Determine which links are down from dashboard link_states
-  const downLinks = new Set(
+  const downSet = new Set(
     (dashboard?.link_states || [])
       .filter(l => l.state === 'DOWN')
-      .map(l => l.link)
+      .map(l => normalizeLinkName(l.link))
   );
 
   const enrichedLinks = (topology.links || []).map(lk => {
-    const linkId = `${lk.source}-${lk.target}`;
+    const linkId  = `${lk.source}-${lk.target}`;
     const linkIdR = `${lk.target}-${lk.source}`;
-    const isDown = downLinks.has(linkId) || downLinks.has(linkIdR);
+    const isDown = downSet.has(linkId) || downSet.has(linkIdR);
     return { ...lk, status: isDown ? 'down' : 'up' };
   });
 
