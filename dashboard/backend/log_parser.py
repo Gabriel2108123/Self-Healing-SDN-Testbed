@@ -200,20 +200,49 @@ def detect_controller_status(events: list[dict]) -> str:
 # Link state derivation from network_events.log (for live mode)
 # ---------------------------------------------------------------------------
 
-_ADD_LINK_RE = re.compile(
-    r"[Ll]ink\s+added[:\s]+s(\d+)[:\-]port(\d+)\s*[-\->]+\s*s(\d+)[:\-]port(\d+)"
+# Matches both "Link added: ..." and "Observed link add: ..."
+_OBS_ADD_LINK_RE = re.compile(
+    r"(?:Observed\s+link\s+add|Link\s+added)[:\s]+s(\d+)[:\-]port(\d+)\s*[-\->]+\s*s(\d+)[:\-]port(\d+)",
+    re.IGNORECASE,
 )
-_DEL_LINK_RE = re.compile(
-    r"[Ll]ink\s+deleted[:\s]+s(\d+)[:\-]port(\d+)\s*[-\->]+\s*s(\d+)[:\-]port(\d+)"
+# Matches both "Link deleted: ..." and "Observed link delete: ..."
+_OBS_DEL_LINK_RE = re.compile(
+    r"(?:Observed\s+link\s+delete|Link\s+deleted)[:\s]+s(\d+)[:\-]port(\d+)\s*[-\->]+\s*s(\d+)[:\-]port(\d+)",
+    re.IGNORECASE,
 )
-# Simpler fallback: 's1-s2' or 's1:s2' style with UP/DOWN keyword
-_SIMPLE_LINK_RE = re.compile(r"(s\d+)[:\-](s\d+).*(UP|DOWN|added|deleted)", re.I)
+
+
+def _normalize_switch_link(s1: str, p1: str, s2: str, p2: str):
+    """
+    Canonicalise a directional switch-switch link into one stable key.
+    Both (s1,p2,s2,p2) and (s2,p2,s1,p2) map to the same key so that
+    duplicate log lines in opposite directions don't create two entries.
+
+    Returns: (key, source, target)
+    """
+    left  = (int(s1), int(p1))
+    right = (int(s2), int(p2))
+    if left <= right:
+        source, target = f"s{s1}", f"s{s2}"
+        key = f"{source}:p{p1}-{target}:p{p2}"
+    else:
+        source, target = f"s{s2}", f"s{s1}"
+        key = f"{source}:p{p2}-{target}:p{p1}"
+    return key, source, target
 
 
 def build_link_states_from_events(path: str) -> list[dict]:
     """
-    Derive link states by scanning network_events.log for 'Link added' /
-    'Link deleted' lines.  Returns the latest known state per link.
+    Derive latest link states from network_events.log.
+
+    Handles all four log formats:
+      - Link added: s1:port2 -> s2:port2
+      - Link deleted: s1:port2 -> s2:port2
+      - Observed link add: s1:port2 -> s2:port2
+      - Observed link delete: s1:port2 -> s2:port2
+
+    Normalizes both directions of the same physical link into one entry,
+    so the last state seen (oldest→newest scan) is the definitive state.
     """
     if not os.path.exists(path):
         return []
@@ -223,49 +252,38 @@ def build_link_states_from_events(path: str) -> list[dict]:
 
     links: dict[str, dict] = {}
 
-    for line in lines:
-        line = line.rstrip()
+    for raw_line in lines:
+        line = raw_line.rstrip()
+        if not line:
+            continue
 
-        m = _ADD_LINK_RE.search(line)
+        ts = _parse_timestamp(line)
+
+        m = _OBS_ADD_LINK_RE.search(line)
         if m:
             s1, p1, s2, p2 = m.groups()
-            key = f"s{s1}:p{p1}-s{s2}:p{p2}"
+            key, source, target = _normalize_switch_link(s1, p1, s2, p2)
             links[key] = {
-                "link":  key,
-                "state": "UP",
-                "source": f"s{s1}",
-                "target": f"s{s2}",
-                "timestamp": _parse_timestamp(line),
+                "link":      key,
+                "state":     "UP",
+                "source":    source,
+                "target":    target,
+                "timestamp": ts,
             }
             continue
 
-        m = _DEL_LINK_RE.search(line)
+        m = _OBS_DEL_LINK_RE.search(line)
         if m:
             s1, p1, s2, p2 = m.groups()
-            key = f"s{s1}:p{p1}-s{s2}:p{p2}"
+            key, source, target = _normalize_switch_link(s1, p1, s2, p2)
             links[key] = {
-                "link":  key,
-                "state": "DOWN",
-                "source": f"s{s1}",
-                "target": f"s{s2}",
-                "timestamp": _parse_timestamp(line),
+                "link":      key,
+                "state":     "DOWN",
+                "source":    source,
+                "target":    target,
+                "timestamp": ts,
             }
             continue
-
-        # Fallback: simpler 's1-s2 ... UP/DOWN' pattern
-        m = _SIMPLE_LINK_RE.search(line)
-        if m:
-            src, tgt, status = m.groups()
-            key = f"{src}-{tgt}"
-            state = "DOWN" if status.lower() in ("down", "deleted") else "UP"
-            if key not in links:
-                links[key] = {
-                    "link":  key,
-                    "state": state,
-                    "source": src,
-                    "target": tgt,
-                    "timestamp": _parse_timestamp(line),
-                }
 
     return list(links.values())
 
@@ -277,8 +295,8 @@ def build_link_states_from_events(path: str) -> list[dict]:
 def count_metrics_from_lines(path: str) -> tuple[int, int, int]:
     """
     Count failures, recoveries, and reroutes directly from raw log lines.
-    More accurate than relying solely on event classification when log
-    format uses keywords not covered by FAILURE_KW etc.
+    Covers both the short 'Link added/deleted' and the Ryu controller's
+    'Observed link add/delete' format.
 
     Returns: (failures, recoveries, reroutes)
     """
@@ -294,14 +312,33 @@ def count_metrics_from_lines(path: str) -> tuple[int, int, int]:
 
     for line in lines:
         lower = line.lower()
-        if "link deleted" in lower or "link_failure" in lower or "link down" in lower:
+
+        if (
+            "link deleted"          in lower or
+            "observed link delete"  in lower or
+            "link_failure"          in lower or
+            "link down"             in lower
+        ):
             failures += 1
-        if "link added" in lower or "restored" in lower or "link up" in lower:
+
+        if (
+            "link added"            in lower or
+            "observed link add"     in lower or
+            "restored"              in lower or
+            "link up"               in lower
+        ):
             recoveries += 1
-        if "reroute" in lower or "backup path" in lower or "failover" in lower:
+
+        if (
+            "reroute"               in lower or
+            "backup path"           in lower or
+            "failover"              in lower or
+            "installing active path" in lower
+        ):
             reroutes += 1
 
     return failures, recoveries, reroutes
+
 
 
 LINK_RE = re.compile(r"([a-zA-Z][a-zA-Z0-9]*)[:\-]([a-zA-Z][a-zA-Z0-9]*)")
