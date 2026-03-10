@@ -20,6 +20,9 @@ Run on Ubuntu:
 import os
 import time
 import threading
+import json
+from urllib.request import urlopen
+from urllib.error import URLError
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
@@ -62,6 +65,61 @@ DOCS_DIR    = os.environ.get(
 EVENTS_LOG  = os.path.join(DOCS_DIR, "network_events.log")
 MONITOR_LOG = os.path.join(DOCS_DIR, "monitor_state.log")
 
+# Ryu built-in REST API — used as primary live topology source.
+# Set SDN_RYU_REST env var to override if Ryu listens on a different address.
+RYU_REST_URL = os.environ.get("SDN_RYU_REST", "http://localhost:8080")
+
+# ---------------------------------------------------------------------------
+# Live topology from Ryu REST API
+# ---------------------------------------------------------------------------
+
+def _fetch_ryu_links() -> list[dict]:
+    """
+    Query Ryu's built-in topology REST API for the current live link table.
+    Ryu updates this graph on PortStatus MODIFY events — so it stays accurate
+    even when Ryu does not re-emit EventLinkAdd after link recovery.
+
+    Returns a list of {link, state, source, target} dicts on success,
+    or an empty list if Ryu REST is not available.
+
+    Requires Ryu to be started with:
+        ryu-manager --observe-links ryu.app.ofctl_rest <your_controller>.py
+    or the ryu.app.rest_topology module loaded.
+    """
+    try:
+        url = f"{RYU_REST_URL}/v1.0/topology/links"
+        with urlopen(url, timeout=1) as resp:
+            data = json.loads(resp.read())
+        result = []
+        seen: set[str] = set()
+        for lk in data:
+            try:
+                src_dpid  = int(lk["src"]["dpid"], 16)
+                src_port  = lk["src"]["port_no"]
+                dst_dpid  = int(lk["dst"]["dpid"], 16)
+                dst_port  = lk["dst"]["port_no"]
+                # Normalise to smaller-dpid first for dedup
+                if (src_dpid, int(src_port)) <= (dst_dpid, int(dst_port)):
+                    key = f"s{src_dpid}:p{src_port}-s{dst_dpid}:p{dst_port}"
+                    source, target = f"s{src_dpid}", f"s{dst_dpid}"
+                else:
+                    key = f"s{dst_dpid}:p{dst_port}-s{src_dpid}:p{src_port}"
+                    source, target = f"s{dst_dpid}", f"s{src_dpid}"
+                if key not in seen:
+                    seen.add(key)
+                    result.append({
+                        "link":   key,
+                        "state":  "UP",   # only live links appear in Ryu's table
+                        "source": source,
+                        "target": target,
+                    })
+            except (KeyError, ValueError):
+                continue
+        return result
+    except (URLError, OSError, json.JSONDecodeError):
+        # Ryu REST not reachable — fall back to log parsing
+        return []
+
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -76,13 +134,27 @@ def _build_dashboard(events, snapshots):
     active_path       = detect_active_path(events)
     controller_status = detect_controller_status(events)
 
-    # Merge link states from monitor log + events log for best coverage
+    # ── Link states: priority order ──────────────────────────────────────────
+    # 1. Ryu REST API  — live, authoritative, survives PortStatus-only recovery
+    # 2. Log parser    — covers history when REST is unavailable
+    # 3. Monitor log   — lowest priority fallback
+    ryu_link_states    = _fetch_ryu_links()
+    events_link_states = build_link_states_from_events(EVENTS_LOG)
     monitor_link_states = extract_link_states(snapshots)
-    events_link_states  = build_link_states_from_events(EVENTS_LOG)
-    # Build a deduplicated map; events log result takes precedence (more granular)
-    link_map = {ls["link"]: ls for ls in monitor_link_states}
+
+    link_map: dict[str, dict] = {}
+    # Lowest priority first (gets overwritten by higher)
+    for ls in monitor_link_states:
+        link_map[ls["link"]] = ls
     for ls in events_link_states:
         link_map[ls["link"]] = ls
+
+    if ryu_link_states:
+        # Ryu REST available — it is the authoritative source.
+        # Any link NOT in Ryu's live table but seen as DOWN in logs → still DOWN.
+        # Any link IN Ryu's table → always UP (Ryu only reports live links).
+        for ls in ryu_link_states:
+            link_map[ls["link"]] = ls
     link_states = list(link_map.values())
 
     any_down     = any(ls["state"] == "DOWN" for ls in link_states)
@@ -95,7 +167,7 @@ def _build_dashboard(events, snapshots):
     reroutes   = raw_reroute or count_events(events, "reroute")
 
     path_is_failover = (active_path == [1, 3, 2])
-    path_label       = "Failover  [1→ 3→ 2]" if path_is_failover else "Normal  [1→ 2]"
+    path_label       = "Failover  [1→3→2]" if path_is_failover else "Normal  [1→2]"
     return {
         "controller_status": controller_status,
         "connectivity":      connectivity,
