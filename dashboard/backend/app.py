@@ -31,6 +31,8 @@ from log_parser import (
     detect_controller_status,
     count_events,
     extract_link_states,
+    build_link_states_from_events,
+    count_metrics_from_lines,
     compute_recovery_stats,
     build_timeline,
 )
@@ -73,14 +75,27 @@ def _load_all():
 def _build_dashboard(events, snapshots):
     active_path       = detect_active_path(events)
     controller_status = detect_controller_status(events)
-    link_states       = extract_link_states(snapshots)
-    any_down          = any(ls["state"] == "DOWN" for ls in link_states)
-    connectivity      = "degraded" if any_down else "connected"
-    failures          = count_events(events, "failure")
-    recoveries        = count_events(events, "recovery")
-    reroutes          = count_events(events, "reroute")
-    path_is_failover  = (active_path == [1, 3, 2])
-    path_label        = "Failover  [1→3→2]" if path_is_failover else "Normal  [1→2]"
+
+    # Merge link states from monitor log + events log for best coverage
+    monitor_link_states = extract_link_states(snapshots)
+    events_link_states  = build_link_states_from_events(EVENTS_LOG)
+    # Build a deduplicated map; events log result takes precedence (more granular)
+    link_map = {ls["link"]: ls for ls in monitor_link_states}
+    for ls in events_link_states:
+        link_map[ls["link"]] = ls
+    link_states = list(link_map.values())
+
+    any_down     = any(ls["state"] == "DOWN" for ls in link_states)
+    connectivity = "degraded" if any_down else "connected"
+
+    # Use raw-line counts for better accuracy on live logs
+    raw_fail, raw_rec, raw_reroute = count_metrics_from_lines(EVENTS_LOG)
+    failures   = raw_fail   or count_events(events, "failure")
+    recoveries = raw_rec    or count_events(events, "recovery")
+    reroutes   = raw_reroute or count_events(events, "reroute")
+
+    path_is_failover = (active_path == [1, 3, 2])
+    path_label       = "Failover  [1→ 3→ 2]" if path_is_failover else "Normal  [1→ 2]"
     return {
         "controller_status": controller_status,
         "connectivity":      connectivity,

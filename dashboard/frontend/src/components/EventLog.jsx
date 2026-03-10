@@ -9,12 +9,20 @@
 
 import React from 'react';
 
-const TYPE_CONFIG = {
-  failure:  { label: 'FAILURE',  cls: 'event-failure'  },
-  recovery: { label: 'RECOVERY', cls: 'event-recovery' },
-  reroute:  { label: 'REROUTE',  cls: 'event-reroute'  },
-  info:     { label: 'INFO',     cls: 'event-info'      },
-};
+// Derive a CSS class + label from event type AND message content.
+// This makes "info"-typed backend events visually useful in the live feed.
+function getEventMeta(type, message) {
+  const msg = (message || '').toLowerCase();
+
+  if (type === 'failure' || msg.includes('link deleted') || msg.includes('down') || msg.includes('failure'))
+    return { label: 'FAILURE',  cls: 'event-failure' };
+  if (type === 'recovery' || msg.includes('restored') || msg.includes('link added') || msg.includes('link up'))
+    return { label: 'RECOVERY', cls: 'event-recovery' };
+  if (type === 'reroute'  || msg.includes('backup') || msg.includes('failover') || msg.includes('reroute'))
+    return { label: 'REROUTE',  cls: 'event-reroute' };
+
+  return { label: 'INFO', cls: 'event-info' };
+}
 
 export default function EventLog({ events = [] }) {
   return (
@@ -45,7 +53,7 @@ export default function EventLog({ events = [] }) {
             </thead>
             <tbody>
               {events.map((ev, idx) => {
-                const cfg = TYPE_CONFIG[ev.type] || TYPE_CONFIG.info;
+                const cfg = getEventMeta(ev.type, ev.message);
                 return (
                   <tr key={idx} className={`event-row ${cfg.cls}`}>
                     <td className="event-time mono">{ev.timestamp || '—'}</td>

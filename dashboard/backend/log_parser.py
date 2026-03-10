@@ -197,8 +197,112 @@ def detect_controller_status(events: list[dict]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Phase 4: Timeline builder
+# Link state derivation from network_events.log (for live mode)
 # ---------------------------------------------------------------------------
+
+_ADD_LINK_RE = re.compile(
+    r"[Ll]ink\s+added[:\s]+s(\d+)[:\-]port(\d+)\s*[-\->]+\s*s(\d+)[:\-]port(\d+)"
+)
+_DEL_LINK_RE = re.compile(
+    r"[Ll]ink\s+deleted[:\s]+s(\d+)[:\-]port(\d+)\s*[-\->]+\s*s(\d+)[:\-]port(\d+)"
+)
+# Simpler fallback: 's1-s2' or 's1:s2' style with UP/DOWN keyword
+_SIMPLE_LINK_RE = re.compile(r"(s\d+)[:\-](s\d+).*(UP|DOWN|added|deleted)", re.I)
+
+
+def build_link_states_from_events(path: str) -> list[dict]:
+    """
+    Derive link states by scanning network_events.log for 'Link added' /
+    'Link deleted' lines.  Returns the latest known state per link.
+    """
+    if not os.path.exists(path):
+        return []
+
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        lines = f.readlines()
+
+    links: dict[str, dict] = {}
+
+    for line in lines:
+        line = line.rstrip()
+
+        m = _ADD_LINK_RE.search(line)
+        if m:
+            s1, p1, s2, p2 = m.groups()
+            key = f"s{s1}:p{p1}-s{s2}:p{p2}"
+            links[key] = {
+                "link":  key,
+                "state": "UP",
+                "source": f"s{s1}",
+                "target": f"s{s2}",
+                "timestamp": _parse_timestamp(line),
+            }
+            continue
+
+        m = _DEL_LINK_RE.search(line)
+        if m:
+            s1, p1, s2, p2 = m.groups()
+            key = f"s{s1}:p{p1}-s{s2}:p{p2}"
+            links[key] = {
+                "link":  key,
+                "state": "DOWN",
+                "source": f"s{s1}",
+                "target": f"s{s2}",
+                "timestamp": _parse_timestamp(line),
+            }
+            continue
+
+        # Fallback: simpler 's1-s2 ... UP/DOWN' pattern
+        m = _SIMPLE_LINK_RE.search(line)
+        if m:
+            src, tgt, status = m.groups()
+            key = f"{src}-{tgt}"
+            state = "DOWN" if status.lower() in ("down", "deleted") else "UP"
+            if key not in links:
+                links[key] = {
+                    "link":  key,
+                    "state": state,
+                    "source": src,
+                    "target": tgt,
+                    "timestamp": _parse_timestamp(line),
+                }
+
+    return list(links.values())
+
+
+# ---------------------------------------------------------------------------
+# Raw-line metric counting (supplements classified-event counting)
+# ---------------------------------------------------------------------------
+
+def count_metrics_from_lines(path: str) -> tuple[int, int, int]:
+    """
+    Count failures, recoveries, and reroutes directly from raw log lines.
+    More accurate than relying solely on event classification when log
+    format uses keywords not covered by FAILURE_KW etc.
+
+    Returns: (failures, recoveries, reroutes)
+    """
+    if not os.path.exists(path):
+        return 0, 0, 0
+
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        lines = f.readlines()
+
+    failures   = 0
+    recoveries = 0
+    reroutes   = 0
+
+    for line in lines:
+        lower = line.lower()
+        if "link deleted" in lower or "link_failure" in lower or "link down" in lower:
+            failures += 1
+        if "link added" in lower or "restored" in lower or "link up" in lower:
+            recoveries += 1
+        if "reroute" in lower or "backup path" in lower or "failover" in lower:
+            reroutes += 1
+
+    return failures, recoveries, reroutes
+
 
 LINK_RE = re.compile(r"([a-zA-Z][a-zA-Z0-9]*)[:\-]([a-zA-Z][a-zA-Z0-9]*)")
 
