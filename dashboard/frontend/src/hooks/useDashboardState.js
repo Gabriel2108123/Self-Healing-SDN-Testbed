@@ -104,62 +104,66 @@ export function useDashboardState() {
     }
   }, [addEvent]);
 
-  const handleStopTopology = useCallback(() => {
-    setTopology(prev => ({ ...prev, status: 'stopped' }));
-    setDashboard(prev => ({ ...prev, controllerStatus: 'offline', recoveryStatus: 'stable' }));
-    setFailedLink(null);
-    setMetrics(INITIAL_METRICS);
-    addEvent('info', 'Topology stopped.');
-    setExplanation({
-      title: 'Network Stopped',
-      body: 'The simulated network has been halted. Controller and all links are offline.'
-    });
+  const handleStopTopology = useCallback(async () => {
+    addEvent('info', 'Stopping topology...');
+    try {
+      const res = await fetch(`${API_BASE}/topology/stop`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to stop');
+      
+      setTopology(prev => ({ ...prev, status: 'stopped' }));
+      setDashboard(prev => ({ ...prev, controllerStatus: 'offline', recoveryStatus: 'stable' }));
+      setFailedLink(null);
+      setMetrics(INITIAL_METRICS);
+      setExplanation({
+        title: 'Network Stopped',
+        body: 'The simulated network has been halted. Controller and all links are offline.'
+      });
+    } catch (err) {
+      console.error(err);
+      addEvent('error', 'Stop failed: ' + err.message);
+    }
   }, [addEvent]);
 
-  const handleResetTopology = useCallback(() => {
+  const handleResetTopology = useCallback(async () => {
     setTopology(prev => ({ ...prev, status: 'launching' }));
     setFailedLink(null);
     addEvent('info', 'Resetting topology...');
-    setTimeout(() => {
-      setTopology(prev => ({ ...prev, status: 'running' }));
-      setDashboard(prev => ({ ...prev, recoveryStatus: 'stable', controllerStatus: 'online' }));
+    
+    try {
+      const res = await fetch(`${API_BASE}/topology/reset`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to reset');
       addEvent('success', 'Topology reset successful.');
       setExplanation({
           title: 'Network Reset',
           body: 'The network has been cleanly reset to its default running state.'
       });
       setMetrics(prev => ({ ...prev, healthScore: 100 }));
-    }, 1000);
+    } catch (err) {
+      console.error(err);
+      addEvent('error', 'Reset failed: ' + err.message);
+      setTopology(prev => ({ ...prev, status: 'error' }));
+    }
   }, [addEvent]);
 
-  const handleSimulateFailure = useCallback(() => {
+  const handleSimulateFailure = useCallback(async () => {
     if (topology.status !== 'running') return;
     
-    // Pick a random link (e.g. S1 -> S2) for mock
-    setFailedLink({ source: 's1', target: 's2' });
     setDashboard(prev => ({ ...prev, recoveryStatus: 'failure detected' }));
-    addEvent('error', 'Critical: Simulated link failure detected between S1 and S2.');
-    setExplanation({
-      title: 'Link Failure Simulated',
-      body: 'A connection between two switches has been broken. The SDN controller is now detecting the fault and recalculating alternative paths.'
-    });
-    setMetrics(prev => ({ ...prev, healthScore: 65, failureDetectionTime: '45ms' }));
-
-    // Simulate recovery process
-    setTimeout(() => {
-      setDashboard(prev => ({ ...prev, recoveryStatus: 'recovering' }));
-      addEvent('warning', 'Recovery workflow initiated. rerouting traffic...');
+    addEvent('warning', 'Sending simulated link failure command...');
+    
+    try {
+      const res = await fetch(`${API_BASE}/topology/simulate-failure`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 's1', target: 's2' })
+      });
+      if (!res.ok) throw new Error('Failed to simulate');
       
-      setTimeout(() => {
-        setDashboard(prev => ({ ...prev, recoveryStatus: 'recovered' }));
-        addEvent('success', 'Traffic rerouted successfully. Network stable.');
-        setExplanation({
-          title: 'Traffic Rerouted',
-          body: 'The controller has successfully installed new flow rules to bypass the failed link. Service is fully restored.'
-        });
-        setMetrics(prev => ({ ...prev, healthScore: 95, recoveryTime: '120ms' }));
-      }, 1500);
-    }, 1000);
+      // Let the polling handle the state updates naturally based on backend events
+    } catch (err) {
+      console.error(err);
+      addEvent('error', 'Failed to simulate link failure: ' + err.message);
+    }
   }, [topology.status, addEvent]);
 
   const toggleLoadBalancing = useCallback(() => {
