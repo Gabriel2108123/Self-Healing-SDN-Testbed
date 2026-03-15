@@ -1,0 +1,50 @@
+name: Build & Deploy Frontend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'dashboard/frontend/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: dashboard/frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: dashboard/frontend
+        run: npm run build
+
+      - name: Set short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          # Use a PAT (Personal Access Token) stored as a repository secret.
+          # The token must have 'repo' write access.
+          # Create one at https://github.com/settings/tokens and store it as
+          # the repository secret PAT_TOKEN (Settings → Secrets → Actions).
+          personal_token: ${{ secrets.PAT_TOKEN }}
+          publish_dir: dashboard/frontend/dist
+          publish_branch: gh-pages
+          commit_message: 'Deploy frontend build from ${{ steps.sha.outputs.short }}'

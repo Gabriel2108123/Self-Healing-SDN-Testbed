@@ -105,3 +105,38 @@ git push
 git pull
 python dashboard/backend/app.py
 ```
+
+---
+
+## CI/CD — Automated Frontend Deployment
+
+A GitHub Actions workflow (`.github/workflows/deploy.yml`) automatically builds the React frontend and deploys it to the `gh-pages` branch whenever you push changes to `dashboard/frontend/` on `main`.
+
+### Setting up the required Personal Access Token
+
+The deployment step needs write access to push to the `gh-pages` branch. This is done through a **Personal Access Token (PAT)** stored as a repository secret.
+
+#### Step 1 — Create a PAT on GitHub
+
+Choose one of the two token types:
+
+| Token type | Where to create |
+|---|---|
+| **Classic token** | [github.com/settings/tokens](https://github.com/settings/tokens) → *Generate new token (classic)* |
+| **Fine-grained token** | [github.com/settings/tokens](https://github.com/settings/tokens) → *Generate new token (fine-grained)* |
+
+**Classic token** — select at minimum the `repo` scope (grants full read/write access to all repositories).
+
+**Fine-grained token** — select this repository, then under *Repository permissions* set **Contents** to **Read and write**.
+
+Copy the generated token — you will only see it once.
+
+#### Step 2 — Add the token as a repository secret
+
+1. Navigate to your repository on GitHub.
+2. Go to **Settings → Secrets and variables → Actions**.
+3. Click **New repository secret**.
+4. Name it exactly `PAT_TOKEN` and paste the token value.
+5. Click **Add secret**.
+
+The workflow references this secret as `${{ secrets.PAT_TOKEN }}` and will now have the write access it needs to publish the built frontend.
