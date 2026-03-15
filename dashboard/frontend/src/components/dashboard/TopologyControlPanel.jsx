@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Panel from '../common/Panel';
 import SelectField from '../common/SelectField';
 import NumberField from '../common/NumberField';
@@ -6,14 +6,18 @@ import Button from '../common/Button';
 
 export default function TopologyControlPanel({ state, actions }) {
   const { topology } = state;
-  const isRunning = topology.status !== 'stopped' && topology.status !== 'idle';
+  const isRunning = topology?.status !== 'stopped' && topology?.status !== 'idle' && topology?.status !== 'unknown';
+  
+  const [localType, setLocalType] = useState('ring');
+  const [localSwitchCount, setLocalSwitchCount] = useState(4);
+  const [localHostsPerSwitch, setLocalHostsPerSwitch] = useState(1);
   
   return (
     <Panel title="Configuration Controls" className="topology-control-panel">
       <SelectField 
         label="Topology Type" 
-        value={topology.type} 
-        onChange={actions.handleTopologyTypeChange}
+        value={localType} 
+        onChange={(val) => setLocalType(val)}
         options={[
           { label: 'Ring', value: 'ring' },
           { label: 'Mesh', value: 'mesh' }
@@ -25,21 +29,21 @@ export default function TopologyControlPanel({ state, actions }) {
         <div style={{ flex: 1 }}>
           <NumberField 
             label="Switch Count" 
-            value={topology.switchCount} 
+            value={localSwitchCount} 
             min={3} 
             max={10} 
-            onChange={actions.handleSwitchCountChange}
+            onChange={(val) => setLocalSwitchCount(Number(val))}
             disabled={isRunning}
-            error={topology.switchCount < 3 || topology.switchCount > 10 ? 'Must be 3-10' : null}
+            error={localSwitchCount < 3 || localSwitchCount > 10 ? 'Must be 3-10' : null}
           />
         </div>
         <div style={{ flex: 1 }}>
           <NumberField 
             label="Hosts Per Switch" 
-            value={topology.hostsPerSwitch} 
+            value={localHostsPerSwitch} 
             min={1} 
             max={5} 
-            onChange={actions.handleHostsChange}
+            onChange={(val) => setLocalHostsPerSwitch(Number(val))}
             disabled={isRunning}
           />
         </div>
@@ -47,7 +51,7 @@ export default function TopologyControlPanel({ state, actions }) {
       
       <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         {!isRunning ? (
-          <Button onClick={actions.handleLaunchTopology} disabled={topology.switchCount < 3}>
+          <Button onClick={() => actions.handleLaunchTopology(localType, localSwitchCount, localHostsPerSwitch)} disabled={localSwitchCount < 3}>
             Launch Topology
           </Button>
         ) : (

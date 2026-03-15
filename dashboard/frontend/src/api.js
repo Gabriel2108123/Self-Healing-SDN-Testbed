@@ -52,3 +52,14 @@ export async function fetchExplanations() {
   return _get('/explanations');
 }
 
+/** Launch a new topology with given config */
+export async function launchTopology(config) {
+  const res = await fetch(`${API_BASE}/topology/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config)
+  });
+  if (!res.ok) throw new Error(`Topology launch failed: ${res.status}`);
+  return res.json();
+}
+

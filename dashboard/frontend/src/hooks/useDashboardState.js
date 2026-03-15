@@ -6,7 +6,7 @@ import {
   INITIAL_EVENTS, 
   INITIAL_EXPLANATION 
 } from '../data/mockData';
-import { fetchDashboard } from '../api';
+import { fetchDashboard, launchTopology } from '../api';
 import { REFRESH_INTERVAL_MS } from '../config';
 
 export function useDashboardState() {
@@ -86,32 +86,23 @@ export function useDashboardState() {
     setTopology(prev => ({ ...prev, hostsPerSwitch: validCount }));
   }, []);
 
-  const handleLaunchTopology = useCallback(() => {
-    setTopology(prev => ({ ...prev, status: 'launching' }));
-    setDashboard(prev => ({ ...prev, controllerStatus: 'online' }));
+  const handleLaunchTopology = useCallback(async (type, switchCount, hostsPerSwitch) => {
+    setTopology(prev => ({ ...prev, status: 'launching', type, switchCount, hostsPerSwitch }));
     addEvent('info', 'Topology launch requested...');
     
-    // Simulate delay
-    setTimeout(() => {
-      setTopology(prev => ({ ...prev, status: 'running' }));
-      setDashboard(prev => ({ ...prev, recoveryStatus: 'stable' }));
-      setFailedLink(null);
-      setMetrics({
-        creationTime: '1.2s',
-        discoveryTime: '0.8s',
-        failureDetectionTime: '—',
-        recoveryTime: '—',
-        activeFlows: topology.switchCount * 4,
-        averageLatency: '12ms',
-        healthScore: 100,
+    try {
+      await launchTopology({
+        topologyType: type,
+        switchCount,
+        hostsPerSwitch
       });
-      addEvent('success', 'Topology launched and stable.');
-      setExplanation({
-        title: 'Network Active',
-        body: `The ${topology.type} topology with ${topology.switchCount} switches is now running securely. The controller is monitoring the network state.`
-      });
-    }, 1500);
-  }, [topology, addEvent]);
+      addEvent('success', 'Topology launch command sent successfully.');
+    } catch (err) {
+      console.error(err);
+      addEvent('error', 'Failed to launch topology: ' + err.message);
+      setTopology(prev => ({ ...prev, status: 'error' }));
+    }
+  }, [addEvent]);
 
   const handleStopTopology = useCallback(() => {
     setTopology(prev => ({ ...prev, status: 'stopped' }));
