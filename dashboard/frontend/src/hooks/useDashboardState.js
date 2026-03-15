@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { 
   INITIAL_TOPOLOGY, 
   INITIAL_DASHBOARD_STATE, 
@@ -6,6 +6,8 @@ import {
   INITIAL_EVENTS, 
   INITIAL_EXPLANATION 
 } from '../data/mockData';
+import { fetchDashboard } from '../api';
+import { REFRESH_INTERVAL_MS } from '../config';
 
 export function useDashboardState() {
   const [topology, setTopology] = useState(INITIAL_TOPOLOGY);
@@ -14,6 +16,43 @@ export function useDashboardState() {
   const [events, setEvents] = useState(INITIAL_EVENTS);
   const [explanation, setExplanation] = useState(INITIAL_EXPLANATION);
   const [failedLink, setFailedLink] = useState(null); // format: { source: 1, target: 2 } or null
+
+  useEffect(() => {
+    let interval;
+    const loadState = async () => {
+      try {
+        const data = await fetchDashboard();
+        
+        // Update all related component state using the backend payload
+        setTopology({
+          type: data.topology?.topologyType || 'unknown',
+          switchCount: data.topology?.switchCount || 0,
+          hostsPerSwitch: data.topology?.hostsPerSwitch || 0,
+          estimatedLinks: data.topology?.estimatedLinks || 0,
+          status: data.topology?.runtimeStatus || 'unknown'
+        });
+        
+        setDashboard({ 
+          controllerStatus: data.controller?.status || 'offline',
+          recoveryStatus: data.recovery?.status || 'stable',
+          mockMode: false,
+          loadBalancingEnabled: data.features?.loadBalancingEnabled || false,
+          predictiveRecoveryEnabled: data.features?.predictiveRecoveryEnabled || false
+        });
+        setMetrics(data.metrics || INITIAL_METRICS);
+        setEvents(data.recentEvents || INITIAL_EVENTS);
+        setExplanation(data.latestExplanation || INITIAL_EXPLANATION);
+
+      } catch (err) {
+        console.error("Failed to fetch dashboard state", err);
+      }
+    };
+
+    loadState();
+    interval = setInterval(loadState, REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const addEvent = useCallback((severity, message) => {
     const newEvent = {

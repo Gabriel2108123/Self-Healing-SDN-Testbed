@@ -10,7 +10,7 @@ export const INITIAL_TOPOLOGY = {
 };
 
 export const INITIAL_DASHBOARD_STATE = {
-  controllerStatus: 'offline', // online, offline
+  controllerStatus: 'online', // online, offline
   recoveryStatus: 'stable',    // stable, monitoring, failure detected, recovering, recovered
   mockMode: true,
   loadBalancingEnabled: false,

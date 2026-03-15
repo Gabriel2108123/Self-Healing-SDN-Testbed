@@ -13,10 +13,10 @@ export const MOCK_MODE = false;
 
 // Flask REST base URL  (only used when MOCK_MODE = false)
 // Using localhost — WSL2 forwards ports to Windows automatically
-export const API_BASE = "http://localhost:5000/api";
+export const API_BASE = "http://172.21.142.130:5000/api";
 
 // WebSocket base URL   (only used when MOCK_MODE = false)
-export const WS_URL = "http://localhost:5000";
+export const WS_URL = "http://172.21.142.130:5000";
 
 // Polling fallback interval (ms) when WebSocket is unavailable
 export const REFRESH_INTERVAL_MS = 5000;

@@ -11,29 +11,30 @@ const IconEvents      = () => (<svg viewBox="0 0 24 24" fill="none" stroke="curr
 export default function StatusOverview({ state }) {
   const { topology, dashboard, events, failedLink } = state;
   
-  const linkCount = topology.type === 'ring' ? topology.switchCount : (topology.switchCount * (topology.switchCount - 1)) / 2;
-  const activeLinks = topology.status === 'running' ? (failedLink ? linkCount - 1 : linkCount) : 0;
+  const linkCount = topology?.type === 'ring' ? topology.switchCount : (topology?.switchCount * (topology?.switchCount - 1)) / 2;
+  const activeLinks = topology?.status === 'running' ? (failedLink ? linkCount - 1 : linkCount) : 0;
   
-  const ctrlSt = dashboard.controllerStatus === 'online' ? 'ok' : 'error';
+  const ctrlSt = dashboard?.controllerStatus === 'online' ? 'ok' : 'error';
   
   let recovStatusSt = 'info';
-  if (dashboard.recoveryStatus === 'stable') recovStatusSt = 'ok';
-  else if (dashboard.recoveryStatus === 'failure detected') recovStatusSt = 'error';
-  else if (dashboard.recoveryStatus === 'recovering') recovStatusSt = 'warning';
+  const recovStatus = dashboard?.recoveryStatus || 'unknown';
+  if (recovStatus === 'stable') recovStatusSt = 'ok';
+  else if (recovStatus === 'failure detected') recovStatusSt = 'error';
+  else if (recovStatus === 'recovering') recovStatusSt = 'warning';
 
   return (
     <section className="cards-grid" aria-label="Status overview">
       <StatusCard 
         title="Topology" 
-        value={topology.type.charAt(0).toUpperCase() + topology.type.slice(1)} 
+        value={(topology?.type || 'unknown').charAt(0).toUpperCase() + (topology?.type || 'unknown').slice(1)} 
         status="info" 
         icon={<IconConnectivity />}  
         sub={`${topology.switchCount} switches`}
       />
       <StatusCard 
         title="Active Links" 
-        value={topology.status === 'running' ? activeLinks : 0} 
-        status={topology.status === 'running' && activeLinks > 0 ? 'ok' : 'info'} 
+        value={topology?.status === 'running' ? activeLinks : 0} 
+        status={topology?.status === 'running' && activeLinks > 0 ? 'ok' : 'info'} 
         icon={<IconPath />} 
         sub={`Estimated total: ${linkCount}`}
       />
@@ -46,17 +47,17 @@ export default function StatusOverview({ state }) {
       />
       <StatusCard 
         title="Recovery State" 
-        value={dashboard.recoveryStatus.toUpperCase()} 
+        value={(dashboard?.recoveryStatus || 'unknown').toUpperCase()} 
         status={recovStatusSt} 
         icon={<IconRecovery />}
-        sub={topology.status === 'running' ? 'Monitoring network' : 'Idle'}
+        sub={topology?.status === 'running' ? 'Monitoring network' : 'Idle'}
       />
       <StatusCard 
         title="Controller" 
-        value={dashboard.controllerStatus.toUpperCase()} 
+        value={(dashboard?.controllerStatus || 'unknown').toUpperCase()} 
         status={ctrlSt} 
         icon={<IconController />} 
-        sub={topology.status === 'running' ? 'Ryu OpenFlow' : 'Disconnected'}
+        sub={topology?.status === 'running' ? 'Ryu OpenFlow' : 'Disconnected'}
       />
       <StatusCard 
         title="Recent Events" 

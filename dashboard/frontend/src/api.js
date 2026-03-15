@@ -24,37 +24,31 @@ async function _get(path) {
 
 /** Aggregated dashboard summary */
 export async function fetchDashboard() {
-  if (MOCK_MODE) { await delay(300); return MOCK_DASHBOARD; }
   return _get('/dashboard');
 }
 
 /** Topology nodes + links (enriched with status + kind) */
 export async function fetchTopology() {
-  if (MOCK_MODE) { await delay(200); return MOCK_TOPOLOGY; }
   return _get('/topology');
 }
 
 /** Raw event list */
 export async function fetchEvents() {
-  if (MOCK_MODE) { await delay(200); return { events: MOCK_DASHBOARD.recent_events, count: MOCK_DASHBOARD.total_events }; }
   return _get('/events');
 }
 
 /** Failure/reroute/recovery timeline */
 export async function fetchTimeline() {
-  if (MOCK_MODE) { await delay(200); return MOCK_TIMELINE; }
   return _get('/timeline');
 }
 
 /** Recovery performance stats */
 export async function fetchRecoveryStats() {
-  if (MOCK_MODE) { await delay(200); return MOCK_RECOVERY_STATS; }
   return _get('/recovery-stats');
 }
 
 /** Plain-English explainability entries */
 export async function fetchExplanations() {
-  if (MOCK_MODE) { await delay(200); return MOCK_EXPLANATIONS; }
   return _get('/explanations');
 }
 
