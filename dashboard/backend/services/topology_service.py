@@ -31,11 +31,11 @@ class TopologyService:
         hosts_per_switch = config.get("hostsPerSwitch", 1)
 
         if topology_type == "ring":
-            success, msg = self.mininet.start_ring_topology(switch_count, hosts_per_switch)
+            success, msg = self.mininet.create_ring_topology(switch_count, hosts_per_switch)
         elif topology_type == "linear":
-            success, msg = self.mininet.start_linear_topology(switch_count, hosts_per_switch)
+            success, msg = self.mininet.create_linear_topology(switch_count, hosts_per_switch)
         elif topology_type == "star":
-            success, msg = self.mininet.start_star_topology(switch_count, hosts_per_switch)
+            success, msg = self.mininet.create_star_topology(switch_count, hosts_per_switch)
         else:
             self.dashboard.set_runtime_status("error")
             return False, f"Unsupported topology type: {topology_type}"
@@ -85,7 +85,7 @@ class TopologyService:
             return False, msg
 
     def stop_topology(self):
-        success, msg = self.mininet.stop_network()
+        success, msg = self.mininet.stop_topology()
 
         if success:
             self.dashboard.current_topology_config = None

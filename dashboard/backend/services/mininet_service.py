@@ -202,4 +202,3 @@ class MininetService:
             "stdout": stdout_lines,
             "stderr": stderr_lines
         }
-PY
