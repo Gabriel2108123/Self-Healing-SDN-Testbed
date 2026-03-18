@@ -9,18 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 class MininetService:
-    """
-    Real Mininet launcher for the shared topology entry point:
-
-        topology/network_topology.py
-
-    Supported topology types:
-    - ring
-    - star
-    - mesh
-    - linear
-    """
-
     def __init__(self):
         self.process = None
         self.current_topology = None
@@ -30,10 +18,6 @@ class MininetService:
         self.project_root = Path.home() / "projects" / "sdn-self-healing-project"
         self.topology_dir = self.project_root / "topology"
         self.shared_topology_script = self.topology_dir / "network_topology.py"
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
 
     def _is_running(self) -> bool:
         return self.process is not None and self.process.poll() is None
@@ -69,10 +53,6 @@ class MininetService:
                 logger.warning("Cleanup command failed [%s]: %s", cmd, exc)
 
     def _build_command(self, topology_name: str, switch_count: int, hosts_per_switch: int) -> str:
-        """
-        Build command for your real topology file:
-            sudo -E python3 topology/network_topology.py ring 4 1
-        """
         if not self.shared_topology_script.exists():
             raise FileNotFoundError(f"Topology script not found: {self.shared_topology_script}")
 
@@ -111,7 +91,6 @@ class MininetService:
                 self.current_topology = topology_name
                 self.current_script = "network_topology.py"
 
-                # Give the process a moment to fail fast
                 time.sleep(3)
 
                 if self.process.poll() is not None:
@@ -134,10 +113,6 @@ class MininetService:
                 self.current_script = None
                 return False, str(exc)
 
-    # ------------------------------------------------------------------
-    # Public topology launchers
-    # ------------------------------------------------------------------
-
     def create_ring_topology(self, switch_count: int, hosts_per_switch: int = 1):
         return self._launch_topology("ring", switch_count, hosts_per_switch)
 
@@ -149,10 +124,6 @@ class MininetService:
 
     def create_linear_topology(self, switch_count: int, hosts_per_switch: int = 1):
         return self._launch_topology("linear", switch_count, hosts_per_switch)
-
-    # ------------------------------------------------------------------
-    # Status / stop / logs
-    # ------------------------------------------------------------------
 
     def stop_topology(self):
         with self.lock:
