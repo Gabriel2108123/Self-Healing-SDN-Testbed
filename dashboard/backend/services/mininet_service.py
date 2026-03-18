@@ -1,3 +1,4 @@
+cat > ~/projects/sdn-self-healing-project/dashboard/backend/services/mininet_service.py <<'PY'
 import logging
 import shlex
 import subprocess
@@ -201,3 +202,4 @@ class MininetService:
             "stdout": stdout_lines,
             "stderr": stderr_lines
         }
+PY
