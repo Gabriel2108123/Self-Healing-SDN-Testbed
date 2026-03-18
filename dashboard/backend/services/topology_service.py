@@ -13,40 +13,41 @@ class TopologyService:
 
     def create_topology(self, config: dict):
         is_valid, err_msg = validate_topology_config(config)
+
         if not is_valid:
             logger.warning(f"Validation failed: {err_msg}")
             return False, err_msg
 
-        ev = self.events.add_event("info", "info", f"Topology configured as {config.get('topologyType')}.")
+        self.events.add_event(
+            "info",
+            "info",
+            f"Topology configured as {config.get('topologyType')}"
+        )
+
         self.dashboard.set_topology_state(config, status="launching")
-        
-        # Mininet launch abstraction
-        t_type = config.get("topologyType")
-        switches = config.get("switchCount")
-        hosts = config.get("hostsPerSwitch", 1)
-        
-        if t_type == "ring":
-            success, msg = self.mininet.create_ring_topology(switches, hosts)
-        elif t_type == "star":
-            success, msg = self.mininet.create_star_topology(switches, hosts)
-        elif t_type == "linear":
-            success, msg = self.mininet.create_linear_topology(switches, hosts)
+
+        topology_type = config.get("topologyType")
+        switch_count = config.get("switchCount")
+        hosts_per_switch = config.get("hostsPerSwitch", 1)
+
+        if topology_type == "ring":
+            success, msg = self.mininet.start_ring_topology(switch_count, hosts_per_switch)
+        elif topology_type == "linear":
+            success, msg = self.mininet.start_linear_topology(switch_count, hosts_per_switch)
+        elif topology_type == "star":
+            success, msg = self.mininet.start_star_topology(switch_count, hosts_per_switch)
         else:
-            success, msg = self.mininet.create_mesh_topology(switches, hosts)
+            self.dashboard.set_runtime_status("error")
+            return False, f"Unsupported topology type: {topology_type}"
 
         if success:
             self.dashboard.set_runtime_status("running")
-            self.dashboard.controller_service.set_mock_status("online")
-            self.metrics.initialise_metrics(config)
-            
-            ev = self.events.add_event("success", "success", "Topology launched successfully.")
-            self.explanations.explain_topology_created(config, event_id=ev["id"])
-            
-            return True, "Topology created successfully."
-        else:
-            self.dashboard.set_runtime_status("error")
-            self.events.add_event("error", "error", f"Topology launch failed: {msg}")
-            return False, msg
+            self.events.add_event("success", "success", "Topology launched successfully")
+            return True, msg
+
+        self.dashboard.set_runtime_status("error")
+        self.events.add_event("error", "error", f"Topology launch failed: {msg}")
+        return False, msg
 
     def reset_topology(self):
         if not self.dashboard.running:
@@ -84,16 +85,17 @@ class TopologyService:
             return False, msg
 
     def stop_topology(self):
-        success, msg = self.mininet.stop_topology()
+        success, msg = self.mininet.stop_network()
+
         if success:
+            self.dashboard.current_topology_config = None
             self.dashboard.set_runtime_status("stopped")
-            self.dashboard.controller_service.set_mock_status("offline")
-            self.metrics.reset()
-            ev = self.events.add_event("info", "info", "Topology stopped safely by user.")
-            self.explanations.explain_topology_stopped(event_id=ev["id"])
-            return True, "Topology stopped."
-        else:
-            return False, msg
+            self.events.add_event("info", "info", "Topology stopped successfully")
+            return True, msg
+
+        self.dashboard.set_runtime_status("error")
+        self.events.add_event("error", "error", f"Failed to stop topology: {msg}")
+        return False, msg
 
     def get_current_topology(self):
         return self.dashboard.get_dashboard_summary()["topology"]
