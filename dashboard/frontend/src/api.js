@@ -63,3 +63,28 @@ export async function launchTopology(config) {
   return res.json();
 }
 
+/** Stop the currently running topology */
+export async function stopTopology() {
+  const res = await fetch(`${API_BASE}/topology/stop`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Topology stop failed: ${res.status}`);
+  return res.json();
+}
+
+/** Reset the currently running topology */
+export async function resetTopology() {
+  const res = await fetch(`${API_BASE}/topology/reset`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Topology reset failed: ${res.status}`);
+  return res.json();
+}
+
+/** Simulate a link failure */
+export async function simulateFailure(config) {
+  const res = await fetch(`${API_BASE}/topology/simulate-failure`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config)
+  });
+  if (!res.ok) throw new Error(`Simulation failed: ${res.status}`);
+  return res.json();
+}
+

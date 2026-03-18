@@ -6,7 +6,7 @@ import {
   INITIAL_EVENTS, 
   INITIAL_EXPLANATION 
 } from '../data/mockData';
-import { fetchDashboard, launchTopology } from '../api';
+import { fetchDashboard, launchTopology, stopTopology, resetTopology, simulateFailure } from '../api';
 import { REFRESH_INTERVAL_MS } from '../config';
 
 export function useDashboardState() {
@@ -107,8 +107,7 @@ export function useDashboardState() {
   const handleStopTopology = useCallback(async () => {
     addEvent('info', 'Stopping topology...');
     try {
-      const res = await fetch(`${API_BASE}/topology/stop`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to stop');
+      await stopTopology();
       
       setTopology(prev => ({ ...prev, status: 'stopped' }));
       setDashboard(prev => ({ ...prev, controllerStatus: 'offline', recoveryStatus: 'stable' }));
@@ -130,8 +129,7 @@ export function useDashboardState() {
     addEvent('info', 'Resetting topology...');
     
     try {
-      const res = await fetch(`${API_BASE}/topology/reset`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to reset');
+      await resetTopology();
       addEvent('success', 'Topology reset successful.');
       setExplanation({
           title: 'Network Reset',
@@ -152,12 +150,7 @@ export function useDashboardState() {
     addEvent('warning', 'Sending simulated link failure command...');
     
     try {
-      const res = await fetch(`${API_BASE}/topology/simulate-failure`, { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 's1', target: 's2' })
-      });
-      if (!res.ok) throw new Error('Failed to simulate');
+      await simulateFailure({ source: 's1', target: 's2' });
       
       // Let the polling handle the state updates naturally based on backend events
     } catch (err) {

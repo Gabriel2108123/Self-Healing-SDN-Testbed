@@ -17,8 +17,8 @@ export default function EventLogPanel({ state }) {
             </tr>
           </thead>
           <tbody>
-            {events.map((event) => (
-              <tr key={event.id} className="event-row">
+            {events.map((event, index) => (
+              <tr key={`${event.id}-${index}`} className="event-row">
                 <td className="event-time" style={{ fontSize: '0.75rem' }}>
                   {new Date(event.timestamp).toLocaleTimeString([], { hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </td>
