@@ -26,9 +26,13 @@ class TopologyService:
         hosts = config.get("hostsPerSwitch", 1)
         
         if t_type == "ring":
-            success, msg = self.mininet.launch_ring_topology(switches, hosts)
+            success, msg = self.mininet.create_ring_topology(switches, hosts)
+        elif t_type == "star":
+            success, msg = self.mininet.create_star_topology(switches, hosts)
+        elif t_type == "linear":
+            success, msg = self.mininet.create_linear_topology(switches, hosts)
         else:
-            success, msg = self.mininet.launch_mesh_topology(switches, hosts)
+            success, msg = self.mininet.create_mesh_topology(switches, hosts)
 
         if success:
             self.dashboard.set_runtime_status("running")
@@ -52,7 +56,22 @@ class TopologyService:
         self.events.add_event("info", "info", "Resetting topology requested.")
         self.dashboard.set_runtime_status("launching")
         
-        success, msg = self.mininet.reset_topology(config)
+        success, msg = self.mininet.stop_topology()
+        if not success:
+            logger.warning(f"Failed to fully stop topology during reset: {msg}")
+
+        t_type = config.get("topologyType")
+        switches = config.get("switchCount")
+        hosts = config.get("hostsPerSwitch", 1)
+
+        if t_type == "ring":
+            success, msg = self.mininet.create_ring_topology(switches, hosts)
+        elif t_type == "star":
+            success, msg = self.mininet.create_star_topology(switches, hosts)
+        elif t_type == "linear":
+            success, msg = self.mininet.create_linear_topology(switches, hosts)
+        else:
+            success, msg = self.mininet.create_mesh_topology(switches, hosts)
         if success:
             self.dashboard.set_runtime_status("running")
             self.dashboard.controller_service.set_recovery_status("stable")
