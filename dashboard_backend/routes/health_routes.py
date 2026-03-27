@@ -7,6 +7,6 @@ health_bp = Blueprint('health', __name__)
 def health():
     return jsonify({
         "status": "ok",
-        "mode": "mock", # Phase 1 mock mode
+        "mode": "live",
         "timestamp": datetime.now(timezone.utc).isoformat()
     })

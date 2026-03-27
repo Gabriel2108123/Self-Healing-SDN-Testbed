@@ -4,7 +4,7 @@ class ControllerService:
         Backend-facing adapter for SDN controller integration.
         For Phase 1, it provides safe mock placeholders.
         """
-        self._mock_status = "offline"
+        self._mock_status = "unknown"
         self._recovery_status = "stable"
 
     def set_mock_status(self, status: str):

@@ -16,7 +16,7 @@ class MininetService:
         self.current_script = None
         self.lock = threading.Lock()
 
-        self.project_root = Path.home() / "projects" / "sdn-self-healing-project"
+        self.project_root = Path(__file__).resolve().parents[2]
         self.topology_dir = self.project_root / "topology"
         self.shared_topology_script = self.topology_dir / "network_topology.py"
 

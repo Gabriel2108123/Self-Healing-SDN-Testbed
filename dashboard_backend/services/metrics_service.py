@@ -17,7 +17,7 @@ class MetricsService:
             "activeFlows": 0,
             "averageLatencyMs": None,
             "healthScore": 100,
-            "isMock": True # Preparing for Phase 2 replace
+            "isMock": False
         }
 
     def initialise_metrics(self, config):

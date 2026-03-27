@@ -53,7 +53,7 @@ class DashboardStateService:
             "topology": topo,
             "controller": {
                 "status": self.controller_service.get_controller_status(),
-                "mode": "mock"
+                "mode": "live"
             },
             "metrics": self.metrics_service.get_metrics(),
             "recovery": {
