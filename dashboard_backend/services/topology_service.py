@@ -18,6 +18,11 @@ class TopologyService:
             logger.warning(f"Validation failed: {err_msg}")
             return False, err_msg
 
+        if self.dashboard.running:
+            current = self.dashboard.current_topology_config or {}
+            current_type = current.get("topologyType", "unknown")
+            return False, f"A topology is already running: {current_type}"
+
         self.events.add_event(
             "info",
             "info",
