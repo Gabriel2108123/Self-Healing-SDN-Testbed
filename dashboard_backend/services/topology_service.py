@@ -40,7 +40,9 @@ class TopologyService:
 
         if success:
             self.dashboard.set_runtime_status("running")
-            self.events.add_event("success", "success", "Topology launched successfully")
+            self.metrics.initialise_metrics(config)
+            event = self.events.add_event("success", "success", "Topology launched successfully")
+            self.explanations.explain_topology_created(config, event_id=event["id"])
             return True, msg
 
         self.dashboard.set_runtime_status("error")
@@ -85,10 +87,13 @@ class TopologyService:
     def stop_topology(self):
         success, msg = self.mininet.stop_topology()
 
+
         if success:
             self.dashboard.current_topology_config = None
             self.dashboard.set_runtime_status("stopped")
-            self.events.add_event("info", "info", "Topology stopped successfully")
+            self.metrics.reset()
+            event = self.events.add_event("info", "info", "Topology stopped successfully")
+            self.explanations.explain_topology_stopped(event_id=event["id"])
             return True, msg
 
         self.dashboard.set_runtime_status("error")

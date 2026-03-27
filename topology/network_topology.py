@@ -1,9 +1,17 @@
 from mininet.net import Mininet
 from mininet.node import RemoteController, OVSSwitch
 from mininet.log import setLogLevel, info
-from topology.topology_generator import get_topology
+import os
 import sys
 import time
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
+
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from topology.topology_generator import get_topology
 
 
 def run(topology_type="ring", switch_count=3, hosts_per_switch=1):
