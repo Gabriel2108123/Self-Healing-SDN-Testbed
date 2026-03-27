@@ -111,21 +111,41 @@ class TopologyService:
     def simulate_failure(self, request_payload: dict):
         if not self.dashboard.running:
             return False, "Cannot simulate failure: network is offline."
-            
+
         src = request_payload.get("sourceSwitch", "s1")
         dst = request_payload.get("targetSwitch", "s2")
-        
+
+        # Failure detected
         self.dashboard.controller_service.set_recovery_status("failure detected")
-        ev = self.events.add_event("error", "error", f"Critical: Simulated link failure detected between {src} and {dst}.")
-        self.explanations.explain_failure_detected(event_id=ev["id"])
-        
-        # Simulate recovery transitions immediately (mock Phase 1 behaviour)
+        self.metrics.record_failure_detection_time(120)
+        self.metrics.set_health_score(65)
+
+        failure_event = self.events.add_event(
+            "error",
+            "error",
+            f"Critical: Simulated link failure detected between {src} and {dst}."
+        )
+        self.explanations.explain_failure_detected(event_id=failure_event["id"])
+
+        # Recovery started
         self.dashboard.controller_service.set_recovery_status("recovering")
-        self.events.add_event("warning", "warning", "Recovery workflow initiated. rerouting traffic...")
-        self.explanations.explain_recovery_started()
-        
+        recovery_start_event = self.events.add_event(
+            "warning",
+            "warning",
+            "Recovery workflow initiated. rerouting traffic..."
+        )
+        self.explanations.explain_recovery_started(event_id=recovery_start_event["id"])
+
+        # Recovery completed
         self.dashboard.controller_service.set_recovery_status("recovered")
-        self.events.add_event("success", "success", "Traffic rerouted successfully. Network stable.")
-        self.explanations.explain_recovery_completed()
-        
+        self.metrics.record_recovery_time(340)
+        self.metrics.set_health_score(95)
+
+        recovery_complete_event = self.events.add_event(
+            "success",
+            "success",
+            "Traffic rerouted successfully. Network stable."
+        )
+        self.explanations.explain_recovery_completed(event_id=recovery_complete_event["id"])
+
         return True, "Failure simulation triggered and recovery completed (mock)."
