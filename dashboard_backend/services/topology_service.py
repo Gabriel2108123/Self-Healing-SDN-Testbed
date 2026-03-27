@@ -32,10 +32,8 @@ class TopologyService:
 
         if topology_type == "ring":
             success, msg = self.mininet.create_ring_topology(switch_count, hosts_per_switch)
-        elif topology_type == "linear":
-            success, msg = self.mininet.create_linear_topology(switch_count, hosts_per_switch)
-        elif topology_type == "star":
-            success, msg = self.mininet.create_star_topology(switch_count, hosts_per_switch)
+        elif topology_type == "mesh":
+            success, msg = self.mininet.create_mesh_topology(switch_count, hosts_per_switch)
         else:
             self.dashboard.set_runtime_status("error")
             return False, f"Unsupported topology type: {topology_type}"
@@ -54,9 +52,10 @@ class TopologyService:
             return False, "No topology is currently running to reset."
 
         config = self.dashboard.current_topology_config
+
         self.events.add_event("info", "info", "Resetting topology requested.")
         self.dashboard.set_runtime_status("launching")
-        
+
         success, msg = self.mininet.stop_topology()
         if not success:
             logger.warning(f"Failed to fully stop topology during reset: {msg}")
@@ -67,12 +66,12 @@ class TopologyService:
 
         if t_type == "ring":
             success, msg = self.mininet.create_ring_topology(switches, hosts)
-        elif t_type == "star":
-            success, msg = self.mininet.create_star_topology(switches, hosts)
-        elif t_type == "linear":
-            success, msg = self.mininet.create_linear_topology(switches, hosts)
-        else:
+        elif t_type == "mesh":
             success, msg = self.mininet.create_mesh_topology(switches, hosts)
+        else:
+            self.dashboard.set_runtime_status("error")
+            return False, f"Unsupported topology type during reset: {t_type}"
+
         if success:
             self.dashboard.set_runtime_status("running")
             self.dashboard.controller_service.set_recovery_status("stable")
@@ -80,10 +79,9 @@ class TopologyService:
             self.events.add_event("success", "success", "Topology reset successfully.")
             self.explanations.explain_topology_created(config)
             return True, "Topology reset successfully."
-        else:
-            self.dashboard.set_runtime_status("error")
-            return False, msg
 
+        self.dashboard.set_runtime_status("error")
+        return False, msg
     def stop_topology(self):
         success, msg = self.mininet.stop_topology()
 
