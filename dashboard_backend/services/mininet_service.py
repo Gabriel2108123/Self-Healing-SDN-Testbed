@@ -1,4 +1,3 @@
-
 import logging
 import shlex
 import subprocess
@@ -59,6 +58,7 @@ class MininetService:
 
         args = [
             "sudo",
+            "-n",
             "-E",
             "python3",
             str(self.shared_topology_script),
