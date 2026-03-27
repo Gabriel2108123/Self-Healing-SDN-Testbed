@@ -41,10 +41,8 @@ class MininetService:
             "sudo pkill -f mininet",
             "sudo pkill -f ovs-controller",
             "sudo pkill -f ofdatapath",
-            "sudo pkill -f ryu-manager",
-            "sudo pkill -f osken-manager",
-            "sudo pkill -f network_topology.py",
-        ]
+	    "sudo pkill -f network_topology.py",
+         ]
 
         for cmd in commands:
             try:
