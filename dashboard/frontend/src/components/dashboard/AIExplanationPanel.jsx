@@ -7,8 +7,15 @@ export default function AIExplanationPanel({ state }) {
   return (
     <Panel title="AI Network Analysis" className="ai-explanation-panel">
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.5rem' }}>
-        <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--accent)' }}>{explanation.title}</h4>
-        <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text)', lineHeight: 1.5 }}>
+        <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--accent)' }}>{explanation.title}</h4>
+        
+        {explanation.sourceEventId && (
+          <div style={{ fontSize: '0.75rem', color: 'var(--blue)', fontWeight: 600, textTransform: 'uppercase' }}>
+            Based on event: <span style={{ fontFamily: 'monospace' }}>{explanation.sourceEventId}</span>
+          </div>
+        )}
+        
+        <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.6 }}>
           {explanation.body}
         </p>
 

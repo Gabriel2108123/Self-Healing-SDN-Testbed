@@ -6,7 +6,7 @@ import Button from '../common/Button';
 
 export default function TopologyControlPanel({ state, actions }) {
   const { topology } = state;
-  const isRunning = topology?.status !== 'stopped' && topology?.status !== 'idle' && topology?.status !== 'unknown';
+  const isLocked = topology?.status === 'running' || topology?.status === 'launching';
   
   const [localType, setLocalType] = useState('ring');
   const [localSwitchCount, setLocalSwitchCount] = useState(4);
@@ -22,7 +22,7 @@ export default function TopologyControlPanel({ state, actions }) {
           { label: 'Ring', value: 'ring' },
           { label: 'Mesh', value: 'mesh' }
         ]}
-        disabled={isRunning}
+        disabled={isLocked}
       />
       
       <div style={{ display: 'flex', gap: '1rem' }}>
@@ -33,7 +33,7 @@ export default function TopologyControlPanel({ state, actions }) {
             min={3} 
             max={10} 
             onChange={(val) => setLocalSwitchCount(Number(val))}
-            disabled={isRunning}
+            disabled={isLocked}
             error={localSwitchCount < 3 || localSwitchCount > 10 ? 'Must be 3-10' : null}
           />
         </div>
@@ -44,17 +44,25 @@ export default function TopologyControlPanel({ state, actions }) {
             min={1} 
             max={5} 
             onChange={(val) => setLocalHostsPerSwitch(Number(val))}
-            disabled={isRunning}
+            disabled={isLocked}
           />
         </div>
       </div>
       
       <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        {!isRunning ? (
+        {(topology.status === 'idle' || topology.status === 'stopped' || topology.status === 'unknown') && (
           <Button onClick={() => actions.handleLaunchTopology(localType, localSwitchCount, localHostsPerSwitch)} disabled={localSwitchCount < 3}>
             Launch Topology
           </Button>
-        ) : (
+        )}
+        
+        {topology.status === 'launching' && (
+          <Button disabled={true}>
+            Launching... Please Wait
+          </Button>
+        )}
+
+        {topology.status === 'running' && (
           <>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <Button style={{ flex: 1 }} variant="danger" onClick={actions.handleStopTopology}>
@@ -68,11 +76,27 @@ export default function TopologyControlPanel({ state, actions }) {
             <Button 
                 variant="danger" 
                 onClick={actions.handleSimulateFailure} 
-                disabled={topology.status !== 'running' || state.failedLink != null || state.isSimulatingFailure}
+                disabled={state.isSimulatingFailure}
                 style={{ marginTop: '0.5rem' }}
             >
               Simulate Failure
             </Button>
+          </>
+        )}
+
+        {topology.status === 'error' && (
+          <>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <Button style={{ flex: 1 }} variant="danger" onClick={actions.handleStopTopology}>
+                Force Stop
+              </Button>
+              <Button style={{ flex: 1 }} variant="secondary" onClick={actions.handleResetTopology}>
+                Force Reset
+              </Button>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--red)', marginTop: '0.4rem', textAlign: 'center' }}>
+              Network encountered an error.
+            </div>
           </>
         )}
       </div>

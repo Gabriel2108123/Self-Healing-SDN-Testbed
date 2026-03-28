@@ -9,16 +9,17 @@ const IconRecovery    = () => (<svg viewBox="0 0 24 24" fill="none" stroke="curr
 const IconEvents      = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>);
 
 export default function StatusOverview({ state }) {
-  const { topology, dashboard, events, failedLink } = state;
+  const { topology, dashboard, events, metrics } = state;
   
   const linkCount = topology?.type === 'ring' ? topology.switchCount : (topology?.switchCount * (topology?.switchCount - 1)) / 2;
-  const activeLinks = topology?.status === 'running' ? (failedLink ? linkCount - 1 : linkCount) : 0;
+  const isFailed = topology?.failedLinks?.length > 0 || (metrics?.detectedFailures > 0 && dashboard?.recoveryStatus !== 'recovered');
+  const activeLinks = topology?.status === 'running' ? (isFailed ? Math.max(0, linkCount - 1) : linkCount) : 0;
   
   const ctrlSt = dashboard?.controllerStatus === 'online' ? 'ok' : 'error';
   
   let recovStatusSt = 'info';
   const recovStatus = dashboard?.recoveryStatus || 'unknown';
-  if (recovStatus === 'stable') recovStatusSt = 'ok';
+  if (recovStatus === 'stable' || recovStatus === 'recovered') recovStatusSt = 'ok';
   else if (recovStatus === 'failure detected') recovStatusSt = 'error';
   else if (recovStatus === 'recovering') recovStatusSt = 'warning';
 
@@ -40,10 +41,10 @@ export default function StatusOverview({ state }) {
       />
       <StatusCard 
         title="Detected Failures" 
-        value={failedLink ? 1 : 0} 
-        status={failedLink ? 'error' : 'ok'}  
+        value={metrics?.detectedFailures || 0} 
+        status={metrics?.detectedFailures > 0 ? 'warning' : 'ok'}  
         icon={<IconFailure />}  
-        sub={failedLink ? `Link ${failedLink.source}-${failedLink.target} down` : 'All links up'}
+        sub={isFailed ? `Link failure active` : 'System healthy'}
       />
       <StatusCard 
         title="Recovery State" 

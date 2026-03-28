@@ -6,7 +6,11 @@ import {
   INITIAL_EVENTS, 
   INITIAL_EXPLANATION 
 } from '../data/mockData';
-import { fetchDashboard, launchTopology, stopTopology, resetTopology, simulateFailure } from '../api';
+import { 
+  fetchDashboard, launchTopology, stopTopology, resetTopology, simulateFailure, 
+  toggleLoadBalancing as toggleLoadBalancingAPI, 
+  togglePredictiveAnalytics 
+} from '../api';
 import { REFRESH_INTERVAL_MS } from '../config';
 
 export function useDashboardState() {
@@ -30,7 +34,11 @@ export function useDashboardState() {
           switchCount: data.topology?.switchCount || 0,
           hostsPerSwitch: data.topology?.hostsPerSwitch || 0,
           estimatedLinks: data.topology?.estimatedLinks || 0,
-          status: data.topology?.runtimeStatus || 'unknown'
+          status: data.topology?.runtimeStatus || 'unknown',
+          running: data.topology?.running || false,
+          failedLinks: data.topology?.failedLinks || [],
+          activePathStrategy: data.topology?.activePathStrategy || 'single-path',
+          graph: data.topology?.graph || { nodes: [], links: [] }
         });
         
         setDashboard({ 
@@ -40,9 +48,29 @@ export function useDashboardState() {
           loadBalancingEnabled: data.features?.loadBalancingEnabled || false,
           predictiveRecoveryEnabled: data.features?.predictiveRecoveryEnabled || false
         });
-        setMetrics(data.metrics || INITIAL_METRICS);
+        
+        setMetrics({
+          activeFlows: data.metrics?.activeFlows || 0,
+          averageLatencyMs: data.metrics?.averageLatencyMs || 0,
+          creationTimeMs: data.metrics?.creationTimeMs || 0,
+          discoveryTimeMs: data.metrics?.discoveryTimeMs || 0,
+          failureDetectionTimeMs: data.metrics?.failureDetectionTimeMs || 0,
+          recoveryTimeMs: data.metrics?.recoveryTimeMs || 0,
+          healthScore: data.metrics?.healthScore || 100,
+          detectedFailures: data.metrics?.detectedFailures || 0,
+          successfulRecoveries: data.metrics?.successfulRecoveries || 0,
+          pathStrategy: data.metrics?.pathStrategy || 'single-path',
+          predictedRisk: data.metrics?.predictedRisk || 'Low',
+          predictedIssue: data.metrics?.predictedIssue || 'None'
+        });
+        
         setEvents(data.recentEvents || INITIAL_EVENTS);
-        setExplanation(data.latestExplanation || INITIAL_EXPLANATION);
+        
+        setExplanation({
+          title: data.latestExplanation?.title || 'No Explanation',
+          body: data.latestExplanation?.body || 'Pending initial network analysis.',
+          sourceEventId: data.latestExplanation?.sourceEventId || null
+        });
 
       } catch (err) {
         console.error("Failed to fetch dashboard state", err);
@@ -109,14 +137,7 @@ export function useDashboardState() {
     addEvent('info', 'Stopping topology...');
     try {
       await stopTopology();
-      
-      setTopology(prev => ({ ...prev, status: 'stopped' }));
       setFailedLink(null);
-      setMetrics(INITIAL_METRICS);
-      setExplanation({
-        title: 'Network Stopped',
-        body: 'The simulated network has been halted.'
-      });
     } catch (err) {
       console.error(err);
       addEvent('error', 'Stop failed: ' + err.message);
@@ -124,18 +145,12 @@ export function useDashboardState() {
   }, [addEvent]);
 
   const handleResetTopology = useCallback(async () => {
-    setTopology(prev => ({ ...prev, status: 'launching' }));
     setFailedLink(null);
     addEvent('info', 'Resetting topology...');
     
     try {
       await resetTopology();
       addEvent('success', 'Topology reset successful.');
-      setExplanation({
-          title: 'Network Reset',
-          body: 'The network has been cleanly reset to its default running state.'
-      });
-      setMetrics(prev => ({ ...prev, healthScore: 100 }));
     } catch (err) {
       console.error(err);
       addEvent('error', 'Reset failed: ' + err.message);
@@ -159,21 +174,27 @@ export function useDashboardState() {
     }
   }, [topology.status, isSimulatingFailure, addEvent]);
 
-  const toggleLoadBalancing = useCallback(() => {
-    setDashboard(prev => {
-      const newVal = !prev.loadBalancingEnabled;
-      addEvent('info', `Load balancing ${newVal ? 'enabled' : 'disabled'}.`);
-      return { ...prev, loadBalancingEnabled: newVal };
-    });
-  }, [addEvent]);
+  const toggleLoadBalancing = useCallback(async () => {
+    const newVal = !dashboard.loadBalancingEnabled;
+    try {
+      await toggleLoadBalancingAPI(newVal);
+      addEvent('info', `Adaptive Load Distribution ${newVal ? 'enabled' : 'disabled'}.`);
+    } catch (err) {
+      console.error(err);
+      addEvent('error', `Failed to toggle: ${err.message}`);
+    }
+  }, [dashboard.loadBalancingEnabled, addEvent]);
 
-  const togglePredictiveRecovery = useCallback(() => {
-    setDashboard(prev => {
-      const newVal = !prev.predictiveRecoveryEnabled;
-      addEvent('info', `Predictive recovery ${newVal ? 'enabled' : 'disabled'}.`);
-      return { ...prev, predictiveRecoveryEnabled: newVal };
-    });
-  }, [addEvent]);
+  const togglePredictiveRecovery = useCallback(async () => {
+    const newVal = !dashboard.predictiveRecoveryEnabled;
+    try {
+      await togglePredictiveAnalytics(newVal);
+      addEvent('info', `Predictive Network Insights ${newVal ? 'enabled' : 'disabled'}.`);
+    } catch (err) {
+      console.error(err);
+      addEvent('error', `Failed to toggle: ${err.message}`);
+    }
+  }, [dashboard.predictiveRecoveryEnabled, addEvent]);
 
   return {
     state: {

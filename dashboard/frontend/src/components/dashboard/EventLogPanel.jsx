@@ -19,7 +19,7 @@ export default function EventLogPanel({ state }) {
           <tbody>
             {events.map((event, index) => (
               <tr key={`${event.id}-${index}`} className="event-row">
-                <td className="event-time" style={{ fontSize: '0.75rem' }}>
+                <td className="event-time" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {new Date(event.timestamp).toLocaleTimeString([], { hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </td>
                 <td>
@@ -28,7 +28,7 @@ export default function EventLogPanel({ state }) {
                     type={event.severity === 'error' ? 'danger' : event.severity === 'warning' ? 'warning' : event.severity === 'success' ? 'success' : 'info'} 
                   />
                 </td>
-                <td className="event-message" style={{ fontSize: '0.85rem' }}>{event.message}</td>
+                <td className="event-message" style={{ fontSize: '0.85rem', color: event.severity === 'error' ? 'var(--red)' : event.severity === 'warning' ? 'var(--yellow)' : 'inherit' }}>{event.message}</td>
               </tr>
             ))}
             {events.length === 0 && (

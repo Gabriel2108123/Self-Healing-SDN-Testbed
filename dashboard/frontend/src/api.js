@@ -103,3 +103,29 @@ export async function simulateFailure(config) {
   return res.json();
 }
 
+export async function toggleLoadBalancing(enabled) {
+  const res = await fetch(`${API_BASE}/features/load-balancing`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Toggle failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function togglePredictiveAnalytics(enabled) {
+  const res = await fetch(`${API_BASE}/features/predictive-analytics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Toggle failed: ${res.status}`);
+  }
+  return res.json();
+}
+
