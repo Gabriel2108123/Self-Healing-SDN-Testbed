@@ -20,6 +20,9 @@ class MetricsService:
             "isMock": False,
             "detectedFailures": 0,
             "successfulRecoveries": 0,
+            "predictedRisk": "low",
+            "predictedIssue": "No immediate instability predicted.",
+            "pathStrategy": "single-path",
         }
 
     def initialise_metrics(self, config):
@@ -63,3 +66,11 @@ class MetricsService:
         
     def increment_successful_recoveries(self):
         self._metrics["successfulRecoveries"] += 1
+        
+    def set_prediction(self, risk: str, issue: str):
+        self._metrics["predictedRisk"] = risk
+        self._metrics["predictedIssue"] = issue
+        
+    def set_path_strategy(self, strategy: str):
+        self._metrics["pathStrategy"] = strategy
+        

@@ -48,6 +48,8 @@ class TopologyService:
         if success:
             self.dashboard.set_runtime_status("running")
             self.metrics.initialise_metrics(config)
+            self.metrics.set_path_strategy("single-path")
+            self.metrics.set_prediction("low", "No immediate instability predicted.")
             event = self.events.add_event("success", "success", "Topology launched successfully")
             self.explanations.explain_topology_created(config, event_id=event["id"])
             return True, msg
@@ -130,12 +132,17 @@ class TopologyService:
             }
         ])
         self.dashboard.set_active_path_strategy("rerouted")
+        self.metrics.set_path_strategy("rerouted")
 
         # Failure detected
         self.dashboard.controller_service.set_recovery_status("failure detected")
         self.metrics.increment_detected_failures()
         self.metrics.record_failure_detection_time(120)
         self.metrics.set_health_score(65)
+        self.metrics.set_prediction(
+            "medium",
+            f"A recent failure was detected between {src} and {dst}. Monitoring for repeated instability."
+        )
 
         failure_event = self.events.add_event(
             "error",
@@ -158,6 +165,11 @@ class TopologyService:
         self.metrics.increment_successful_recoveries()
         self.metrics.record_recovery_time(340)
         self.metrics.set_health_score(95)
+        self.metrics.set_path_strategy("rerouted")
+        self.metrics.set_prediction(
+            "low",
+            "The network has recovered successfully. No immediate instability is predicted."
+        )
 
         recovery_complete_event = self.events.add_event(
             "success",
@@ -167,3 +179,4 @@ class TopologyService:
         self.explanations.explain_recovery_completed(event_id=recovery_complete_event["id"])
 
         return True, "Failure simulation triggered and recovery completed (mock)."
+

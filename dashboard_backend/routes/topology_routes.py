@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from services import topology_service
+from services import topology_service, dashboard_state_service
 from models.response_models import success_response, error_response
 
 topology_bp = Blueprint('topology', __name__)
@@ -41,3 +41,23 @@ def simulate_failure():
         return jsonify(success_response(msg))
     else:
         return error_response(msg)
+
+@topology_bp.route('/api/features/load-balancing', methods=['POST'])
+def toggle_load_balancing():
+    payload = request.get_json() or {}
+    enabled = bool(payload.get("enabled", False))
+    dashboard_state_service.set_feature_flags(lb_enabled=enabled)
+    return jsonify(success_response(
+        f"Load balancing {'enabled' if enabled else 'disabled'}.",
+        {"loadBalancingEnabled": enabled}
+    ))
+
+@topology_bp.route('/api/features/predictive-analytics', methods=['POST'])
+def toggle_predictive_analytics():
+    payload = request.get_json() or {}
+    enabled = bool(payload.get("enabled", False))
+    dashboard_state_service.set_feature_flags(pr_enabled=enabled)
+    return jsonify(success_response(
+        f"Predictive analytics {'enabled' if enabled else 'disabled'}.",
+        {"predictiveRecoveryEnabled": enabled}
+    ))
