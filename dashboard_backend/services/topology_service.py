@@ -26,7 +26,7 @@ class TopologyService:
         self.events.add_event(
             "info",
             "info",
-            f"Topology configured as {config.get('topologyType')}"
+            "Topology configured as {config.get('topologyType')}"
         )
 
         self.dashboard.set_topology_state(config, status="launching")
@@ -117,6 +117,7 @@ class TopologyService:
 
         # Failure detected
         self.dashboard.controller_service.set_recovery_status("failure detected")
+        self.metrics.increment_detected_failures()
         self.metrics.record_failure_detection_time(120)
         self.metrics.set_health_score(65)
 
@@ -138,6 +139,7 @@ class TopologyService:
 
         # Recovery completed
         self.dashboard.controller_service.set_recovery_status("recovered")
+        self.metrics.increment_successful_recoveries()
         self.metrics.record_recovery_time(340)
         self.metrics.set_health_score(95)
 

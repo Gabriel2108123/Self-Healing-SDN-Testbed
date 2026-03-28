@@ -17,7 +17,9 @@ class MetricsService:
             "activeFlows": 0,
             "averageLatencyMs": None,
             "healthScore": 100,
-            "isMock": False
+            "isMock": False,
+            "detectedFailures": 0,
+            "successfulRecoveries": 0,
         }
 
     def initialise_metrics(self, config):
@@ -55,3 +57,9 @@ class MetricsService:
         
     def get_metrics(self):
         return self._metrics.copy()
+        
+    def increment_detected_failures(self):
+        self._metrics["detectedFailures"] += 1
+        
+    def increment_successful_recoveries(self):
+        self._metrics["successfulRecoveries"] += 1
