@@ -16,6 +16,7 @@ export function useDashboardState() {
   const [events, setEvents] = useState(INITIAL_EVENTS);
   const [explanation, setExplanation] = useState(INITIAL_EXPLANATION);
   const [failedLink, setFailedLink] = useState(null); // format: { source: 1, target: 2 } or null
+  const [isSimulatingFailure, setIsSimulatingFailure] = useState(false);
 
   useEffect(() => {
     let interval;
@@ -110,12 +111,11 @@ export function useDashboardState() {
       await stopTopology();
       
       setTopology(prev => ({ ...prev, status: 'stopped' }));
-      setDashboard(prev => ({ ...prev, controllerStatus: 'offline', recoveryStatus: 'stable' }));
       setFailedLink(null);
       setMetrics(INITIAL_METRICS);
       setExplanation({
         title: 'Network Stopped',
-        body: 'The simulated network has been halted. Controller and all links are offline.'
+        body: 'The simulated network has been halted.'
       });
     } catch (err) {
       console.error(err);
@@ -144,20 +144,20 @@ export function useDashboardState() {
   }, [addEvent]);
 
   const handleSimulateFailure = useCallback(async () => {
-    if (topology.status !== 'running') return;
-    
-    setDashboard(prev => ({ ...prev, recoveryStatus: 'failure detected' }));
+    if (topology.status !== 'running' || isSimulatingFailure) return;
+
+    setIsSimulatingFailure(true);
     addEvent('warning', 'Sending simulated link failure command...');
-    
+
     try {
-      await simulateFailure({ source: 's1', target: 's2' });
-      
-      // Let the polling handle the state updates naturally based on backend events
+      await simulateFailure({ sourceSwitch: 's1', targetSwitch: 's2' });
     } catch (err) {
       console.error(err);
       addEvent('error', 'Failed to simulate link failure: ' + err.message);
+    } finally {
+      setTimeout(() => setIsSimulatingFailure(false), 1000);
     }
-  }, [topology.status, addEvent]);
+  }, [topology.status, isSimulatingFailure, addEvent]);
 
   const toggleLoadBalancing = useCallback(() => {
     setDashboard(prev => {
@@ -183,6 +183,7 @@ export function useDashboardState() {
       events,
       explanation,
       failedLink,
+      isSimulatingFailure,
     },
     actions: {
       handleTopologyTypeChange,

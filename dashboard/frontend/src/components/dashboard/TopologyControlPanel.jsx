@@ -68,7 +68,7 @@ export default function TopologyControlPanel({ state, actions }) {
             <Button 
                 variant="danger" 
                 onClick={actions.handleSimulateFailure} 
-                disabled={topology.status !== 'running' || state.failedLink != null}
+                disabled={topology.status !== 'running' || state.failedLink != null || state.isSimulatingFailure}
                 style={{ marginTop: '0.5rem' }}
             >
               Simulate Failure
