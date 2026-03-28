@@ -26,10 +26,12 @@ class TopologyService:
         self.events.add_event(
             "info",
             "info",
-            "Topology configured as {config.get('topologyType')}"
+            f"Topology configured as {config.get('topologyType')}"
         )
 
         self.dashboard.set_topology_state(config, status="launching")
+        self.dashboard.clear_failed_links()
+        self.dashboard.set_active_path_strategy("single-path")
 
         topology_type = config.get("topologyType")
         switch_count = config.get("switchCount")
@@ -62,6 +64,8 @@ class TopologyService:
 
         self.events.add_event("info", "info", "Resetting topology requested.")
         self.dashboard.set_runtime_status("launching")
+        self.dashboard.clear_failed_links()
+        self.dashboard.set_active_path_strategy("single-path")
 
         success, msg = self.mininet.stop_topology()
         if not success:
@@ -89,6 +93,7 @@ class TopologyService:
 
         self.dashboard.set_runtime_status("error")
         return False, msg
+
     def stop_topology(self):
         success, msg = self.mininet.stop_topology()
 
@@ -96,6 +101,8 @@ class TopologyService:
         if success:
             self.dashboard.current_topology_config = None
             self.dashboard.set_runtime_status("stopped")
+            self.dashboard.clear_failed_links()
+            self.dashboard.set_active_path_strategy("single-path")
             self.metrics.reset()
             event = self.events.add_event("info", "info", "Topology stopped successfully")
             self.explanations.explain_topology_stopped(event_id=event["id"])
@@ -114,6 +121,15 @@ class TopologyService:
 
         src = request_payload.get("sourceSwitch", "s1")
         dst = request_payload.get("targetSwitch", "s2")
+
+        self.dashboard.set_failed_links([
+            {
+                "source": src,
+                "target": dst,
+                "status": "failed"
+            }
+        ])
+        self.dashboard.set_active_path_strategy("rerouted")
 
         # Failure detected
         self.dashboard.controller_service.set_recovery_status("failure detected")

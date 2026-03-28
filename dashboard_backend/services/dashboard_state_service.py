@@ -6,6 +6,8 @@ class DashboardStateService:
         self.event_service = event_service
         self.explanation_service = explanation_service
         self.controller_service = controller_service
+        self.failed_links = []
+        self.active_path_strategy = "single-path"
         
         self.current_topology_config = None
         self.running = False
@@ -28,6 +30,14 @@ class DashboardStateService:
             self.feature_flags["loadBalancingEnabled"] = lb_enabled
         if pr_enabled is not None:
             self.feature_flags["predictiveRecoveryEnabled"] = pr_enabled
+    def set_failed_links(self, failed_links):
+        self.failed_links = failed_links or []
+
+    def clear_failed_links(self):
+        self.failed_links = []
+
+    def set_active_path_strategy(self, strategy: str):
+        self.active_path_strategy = strategy
 
     def get_dashboard_summary(self):
         """Assembles a full snapshot of the system for the UI base dashboard route."""
@@ -37,7 +47,9 @@ class DashboardStateService:
             "hostsPerSwitch": 0,
             "estimatedLinks": 0,
             "runtimeStatus": self.runtime_status,
-            "running": self.running
+            "running": self.running,
+            "failedLinks": self.failed_links,
+            "activePathStrategy": self.active_path_strategy
         }
         
         if self.current_topology_config:
