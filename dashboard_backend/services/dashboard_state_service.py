@@ -10,6 +10,7 @@ class DashboardStateService:
         self.link_state_service = link_state_service
         self.failed_links = []
         self.active_path_strategy = "single-path"
+        self.auto_failure_enabled = False
         
         self.current_topology_config = None
         self.running = False
@@ -40,6 +41,9 @@ class DashboardStateService:
 
     def set_active_path_strategy(self, strategy: str):
         self.active_path_strategy = strategy
+
+    def set_auto_failure_mode(self, enabled: bool):
+        self.auto_failure_enabled = enabled
 
     def _build_topology_graph(self, topology_type, switch_count, hosts_per_switch):
         nodes = []
@@ -187,7 +191,10 @@ class DashboardStateService:
             "recovery": {
                 "status": self.controller_service.get_recovery_status()
             },
-            "features": self.feature_flags,
+            "features": {
+                **self.feature_flags,
+                "autoFailureEnabled": self.auto_failure_enabled
+            },
             "latestExplanation": self.explanation_service.get_latest_explanation(),
             "recentEvents": self.event_service.get_recent_events(),
             "link_states": self.link_state_service.get_all_links(),

@@ -62,10 +62,23 @@ def recover_link():
 def toggle_load_balancing():
     payload = request.get_json() or {}
     enabled = bool(payload.get("enabled", False))
+
     dashboard_state_service.set_feature_flags(lb_enabled=enabled)
+    dashboard_state_service.set_active_path_strategy(
+        "adaptive-load-distribution" if enabled else "single-path"
+    )
+
+    from services import metrics_service
+    metrics_service.set_path_strategy(
+        "adaptive-load-distribution" if enabled else "single-path"
+    )
+
     return jsonify(success_response(
         f"Load balancing {'enabled' if enabled else 'disabled'}.",
-        {"loadBalancingEnabled": enabled}
+        {
+            "loadBalancingEnabled": enabled,
+            "activePathStrategy": "adaptive-load-distribution" if enabled else "single-path"
+        }
     ))
 
 @topology_bp.route('/api/features/predictive-analytics', methods=['POST'])
@@ -77,3 +90,16 @@ def toggle_predictive_analytics():
         f"Predictive analytics {'enabled' if enabled else 'disabled'}.",
         {"predictiveRecoveryEnabled": enabled}
     ))
+
+@topology_bp.route('/api/features/auto-failure-mode', methods=['POST'])
+def toggle_auto_failure_mode():
+    payload = request.get_json() or {}
+    enabled = bool(payload.get("enabled", False))
+
+    dashboard_state_service.set_auto_failure_mode(enabled)
+
+    return jsonify(success_response(
+        f"Auto-failure mode {'enabled' if enabled else 'disabled'}.",
+        {"autoFailureEnabled": enabled}
+    ))
+
