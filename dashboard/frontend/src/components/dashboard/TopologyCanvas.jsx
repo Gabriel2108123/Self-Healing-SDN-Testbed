@@ -1,8 +1,9 @@
 import React from 'react';
 import Panel from '../common/Panel';
+import { normalizeLinkKey } from '../../hooks/useDashboardState';
 
 export default function TopologyCanvas({ state }) {
-  const { topology, failedLink } = state;
+  const { topology, linkStates, riskyLinks } = state;
   const { type, switchCount, status } = topology;
   
   if (status === 'stopped' || status === 'idle') {
@@ -16,12 +17,12 @@ export default function TopologyCanvas({ state }) {
     );
   }
 
-  const width = 700;
-  const height = 450;
+  const width = 800;
+  const height = 500;
   const cx = width / 2;
   const cy = height / 2;
-  const switchRadius = 130;
-  const hostOffset = 60;
+  const switchRadius = 150;
+  const hostOffset = 80;
 
   // Compute Layout (Circular for switches, star for hosts)
   const renderData = React.useMemo(() => {
@@ -76,10 +77,36 @@ export default function TopologyCanvas({ state }) {
 
   const { nodes, links } = renderData;
 
-  const getLinkColor = (link) => {
-    if (link.kind === 'switch' && link.status === 'failed') return 'var(--red)';
-    if (link.kind === 'host') return 'var(--text-muted)';
-    return 'var(--border)';
+  const getLinkProps = (link) => {
+    let stroke = 'var(--text-muted)';
+    let strokeWidth = 1;
+    let className = 'topo-link';
+    let strokeDasharray = 'none';
+
+    if (link.kind === 'host') {
+      stroke = 'var(--text-faint)';
+      return { stroke, strokeWidth, className, strokeDasharray };
+    }
+
+    const isFailed = link.status === 'failed';
+    const normKey = normalizeLinkKey(link.source, link.target);
+    const apiLinkState = linkStates.find(ls => normalizeLinkKey(ls.source, ls.target) === normKey);
+
+    if (isFailed || (apiLinkState && apiLinkState.status === 'failed')) {
+      stroke = 'var(--red)';
+      strokeWidth = 3;
+      strokeDasharray = '8 6';
+      className += ' pulse-red';
+    } else if (apiLinkState && apiLinkState.status === 'active' && apiLinkState.risk_score >= 25) {
+      stroke = 'var(--amber, orange)';
+      strokeWidth = 2;
+      className += ' pulse-amber';
+    } else {
+      stroke = 'var(--green, #28a745)';
+      strokeWidth = 2;
+    }
+
+    return { stroke, strokeWidth, className, strokeDasharray };
   };
 
   const getPathStrategyBadge = () => {
@@ -97,29 +124,30 @@ export default function TopologyCanvas({ state }) {
       <div style={{ width: '100%', overflowX: 'auto', display: 'flex', justifyContent: 'center' }}>
         <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ maxWidth: '100%', height: 'auto' }}>
           {/* Links */}
-          {links.map((link, idx) => (
-            <line 
-              key={`link-${idx}`}
-              x1={link.sourceNode.x} y1={link.sourceNode.y}
-              x2={link.targetNode.x} y2={link.targetNode.y}
-              stroke={getLinkColor(link)}
-              strokeWidth={link.kind === 'switch' && link.status === 'failed' ? 4 : (link.kind === 'switch' ? 2 : 1)}
-              strokeDasharray={link.status === 'failed' ? '6 6' : 'none'}
-            >
-               <title>{`${link.source} <-> ${link.target}\nKind: ${link.kind || 'switch'}\nStatus: ${link.status || 'unknown'}`}</title>
-            </line>
-          ))}
+          {links.map((link, idx) => {
+            const props = getLinkProps(link);
+            return (
+              <line 
+                key={`link-${idx}`}
+                x1={link.sourceNode.x} y1={link.sourceNode.y}
+                x2={link.targetNode.x} y2={link.targetNode.y}
+                {...props}
+              >
+                 <title>{`${link.source} <-> ${link.target}\nKind: ${link.kind || 'switch'}\nStatus: ${link.status || 'unknown'}`}</title>
+              </line>
+            );
+          })}
           {/* Nodes */}
           {nodes.map((node) => (
             <g key={node.id}>
               <circle 
                 cx={node.x} cy={node.y} 
-                r={node.type === 'host' ? 8 : 22} 
-                fill={node.type === 'host' ? "var(--surface3)" : "var(--surface2)"} 
+                r={node.type === 'host' ? 6 : 26} 
+                fill={node.type === 'host' ? "var(--surface3, #222)" : "var(--surface2)"} 
                 stroke={node.status === 'down' ? "var(--red)" : "var(--accent)"} 
-                strokeWidth={2} 
+                strokeWidth={node.type === 'host' ? 1 : 2} 
               />
-              <text x={node.x} y={node.y} fill="var(--text)" fontSize={node.type === 'host' ? "10" : "12"} fontWeight="bold" textAnchor="middle" dy=".3em">
+              <text x={node.x} y={node.y} fill="var(--text)" fontSize={node.type === 'host' ? "9" : "13"} fontWeight={node.type === 'host' ? "normal" : "bold"} textAnchor="middle" dy={node.type === 'host' ? ".3em" : ".35em"}>
                 {node.label}
               </text>
               <title>{`Node: ${node.id}\nType: ${node.type}\nStatus: ${node.status}`}</title>
@@ -129,13 +157,16 @@ export default function TopologyCanvas({ state }) {
       </div>
       <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', marginTop: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <span style={{ display: 'inline-block', width: '20px', height: '2px', background: 'var(--border)' }}></span> Active Switch Link
+          <span style={{ display: 'inline-block', width: '20px', height: '2px', background: 'var(--green, #28a745)' }}></span> Active Link (Green)
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <span style={{ display: 'inline-block', width: '20px', height: '2px', borderBottom: '3px dashed var(--red)' }}></span> Failed Link (Red)
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <span style={{ display: 'inline-block', width: '20px', height: '2px', background: 'var(--amber, orange)' }}></span> Elevated Risk (Amber)
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <span style={{ display: 'inline-block', width: '20px', height: '1px', background: 'var(--text-muted)' }}></span> Host Link
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <span style={{ display: 'inline-block', width: '20px', height: '2px', borderBottom: '3px dashed var(--red)' }}></span> Failed Link
         </div>
       </div>
     </Panel>

@@ -27,29 +27,6 @@ export async function fetchDashboard() {
   return _get('/dashboard');
 }
 
-/** Topology nodes + links (enriched with status + kind) */
-export async function fetchTopology() {
-  return _get('/topology/current');
-}
-
-/** Raw event list */
-export async function fetchEvents() {
-  return _get('/events');
-}
-
-/** Plain-English explainability entries */
-export async function fetchExplanations() {
-  return _get('/explanations/latest');
-}
-
-export async function fetchMetrics() {
-  return _get('/metrics');
-}
-
-export async function fetchHealth() {
-  return _get('/health');
-}
-
 /** Launch a new topology with given config */
 export async function launchTopology(config) {
   const res = await fetch(`${API_BASE}/topology/create`, {
@@ -84,21 +61,28 @@ export async function resetTopology() {
   return res.json();
 }
 
-/** Simulate a link failure */
-export async function simulateFailure(config) {
-  const payload = {
-    sourceSwitch: config.sourceSwitch ?? config.source ?? 's1',
-    targetSwitch: config.targetSwitch ?? config.target ?? 's2'
-  };
-
-  const res = await fetch(`${API_BASE}/topology/simulate-failure`, {
+/** Simulate a random link failure */
+export async function simulateRandomFailure() {
+  const res = await fetch(`${API_BASE}/topology/simulate-random-failure`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    headers: { 'Content-Type': 'application/json' }
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || `Simulation failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+/** Recover a link */
+export async function recoverLink() {
+  const res = await fetch(`${API_BASE}/topology/recover-link`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Recovery failed: ${res.status}`);
   }
   return res.json();
 }
@@ -129,3 +113,15 @@ export async function togglePredictiveAnalytics(enabled) {
   return res.json();
 }
 
+export async function toggleAutoFailureMode(enabled) {
+  const res = await fetch(`${API_BASE}/features/auto-failure-mode`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Toggle failed: ${res.status}`);
+  }
+  return res.json();
+}

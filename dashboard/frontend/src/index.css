@@ -131,6 +131,16 @@ body {
   50%       { opacity: 0.35; }
 }
 
+@keyframes pulse-red {
+  0%, 100% { filter: drop-shadow(0 0 2px var(--red)); }
+  50% { filter: drop-shadow(0 0 8px var(--red)); }
+}
+
+@keyframes pulse-amber {
+  0%, 100% { filter: drop-shadow(0 0 1px orange); }
+  50% { filter: drop-shadow(0 0 6px orange); }
+}
+
 .refresh-time { font-size: 0.78rem; color: var(--text-muted); }
 
 .btn-refresh {

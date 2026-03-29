@@ -3,14 +3,19 @@ import Panel from '../common/Panel';
 import Badge from '../common/Badge';
 
 export default function TopologySummary({ state }) {
-  const { topology, dashboard } = state;
-  const linkCount = topology?.type === 'ring' ? topology.switchCount : ((topology?.switchCount || 0) * ((topology?.switchCount || 1) - 1)) / 2;
+  const { topology } = state;
+  const topoStatus = topology?.status || 'unknown';
   
   let statusBadgeType = 'info';
-  const topoStatus = topology?.status || 'unknown';
   if (topoStatus === 'running') statusBadgeType = 'ok';
-  else if (topoStatus === 'stopped') statusBadgeType = 'warning';
+  else if (topoStatus === 'stopped' || topoStatus === 'idle') statusBadgeType = 'warning';
   else if (topoStatus === 'launching') statusBadgeType = 'info';
+  else if (topoStatus === 'error') statusBadgeType = 'error';
+
+  const formatStrategy = (strategy) => {
+    if (!strategy) return '—';
+    return strategy.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  };
 
   return (
     <Panel title="Topology Summary">
@@ -29,18 +34,16 @@ export default function TopologySummary({ state }) {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
           <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Estimated Links</span>
-          <strong>{linkCount}</strong>
+          <strong>{topology?.estimatedLinks || 0}</strong>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Path Strategy</span>
+          <strong style={{ color: 'var(--accent)' }}>{formatStrategy(topology?.activePathStrategy)}</strong>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem' }}>
           <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Status</span>
-          <Badge label={(topology?.status || 'unknown').toUpperCase()} type={statusBadgeType} />
+          <Badge label={topoStatus.toUpperCase()} type={statusBadgeType} />
         </div>
-        
-        {dashboard.mockMode && (
-          <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'var(--surface2)', borderRadius: 'var(--r-sm)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            <strong>Note:</strong> Currently in mock mode. Visualisations are approximate placeholders until API is connected.
-          </div>
-        )}
       </div>
     </Panel>
   );
