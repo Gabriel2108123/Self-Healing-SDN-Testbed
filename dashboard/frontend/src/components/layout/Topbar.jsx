@@ -26,18 +26,18 @@ export default function Topbar({ state, onRefresh }) {
       </div>
 
       <div className="header-right">
-        <span className={`mode-badge mode-${state.dashboard.controllerStatus === 'online' ? 'live' : 'mock'}`}>
-          <span className="mode-dot" style={{ animationPlayState: state.dashboard.controllerStatus === 'online' ? 'running' : 'paused' }} />
-          Controller: {state.dashboard.controllerStatus.toUpperCase()}
+        <span className={`mode-badge mode-${(state.dashboard?.controllerStatus || '') === 'online' ? 'live' : 'mock'}`}>
+          <span className="mode-dot" style={{ animationPlayState: (state.dashboard?.controllerStatus || '') === 'online' ? 'running' : 'paused' }} />
+          Controller: {(state.dashboard?.controllerStatus || 'offline').toUpperCase()}
         </span>
-        <span className={`mode-badge mode-${state.topology.status === 'running' ? 'live' : (state.topology.status === 'error' ? 'mock' : 'neutral')}`}>
-          Runtime: {state.topology.status.toUpperCase()}
+        <span className={`mode-badge mode-${state.topology?.status === 'running' ? 'live' : (state.topology?.status === 'error' ? 'mock' : 'neutral')}`}>
+          Runtime: {(state.topology?.status || 'idle').toUpperCase()}
         </span>
         <span className="mode-badge" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>
-          Topology: {state.topology.type.toUpperCase() || 'NONE'}
+          Topology: {(state.topology?.type || 'none').toUpperCase()}
         </span>
 
-        <button className="btn-refresh" onClick={onRefresh} title="Reset Network Topology">
+        <button className="btn-refresh" onClick={onRefresh} title="Refresh dashboard">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <polyline points="23 4 23 10 17 10"/>
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
