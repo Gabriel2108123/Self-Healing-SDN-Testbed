@@ -4,15 +4,22 @@ import React from 'react';
  * Reusable on/off toggle.
  */
 export default function ToggleField({ label, checked, onChange, disabled = false, description }) {
+  const handleClick = () => {
+    if (!disabled && typeof onChange === 'function') onChange();
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '1rem' }}>
-      <label style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '0.75rem', 
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.6 : 1
-      }}>
+      <label
+        onClick={handleClick}
+        style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '0.75rem', 
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.6 : 1,
+          userSelect: 'none',
+        }}>
         <div style={{
           position: 'relative',
           width: '36px',

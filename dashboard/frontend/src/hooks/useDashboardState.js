@@ -35,45 +35,54 @@ export function useDashboardState() {
   const [isSimulatingFailure, setIsSimulatingFailure] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
 
+  // Shared state-updater from a raw dashboard response
+  const applyDashboardData = useCallback((data) => {
+    setTopology({
+      type: data.topology?.topologyType || 'unknown',
+      switchCount: data.topology?.switchCount || 0,
+      hostsPerSwitch: data.topology?.hostsPerSwitch || 0,
+      estimatedLinks: data.topology?.estimatedLinks || 0,
+      status: data.topology?.runtimeStatus || (data.topology?.running ? 'running' : 'idle'),
+      running: data.topology?.running || false,
+      activePathStrategy: data.topology?.activePathStrategy || 'single-path',
+      graph: data.topology?.graph || { nodes: [], links: [] }
+    });
+    setDashboard({ 
+      controllerStatus: data.controller?.status || 'offline',
+      controllerMode: data.controller?.mode || 'unknown',
+      recoveryStatus: data.recovery?.status || 'stable',
+      mockMode: false,
+      loadBalancingEnabled: data.features?.loadBalancingEnabled || false,
+      predictiveRecoveryEnabled: data.features?.predictiveRecoveryEnabled || false,
+      autoFailureEnabled: data.features?.autoFailureEnabled || false
+    });
+    setMetrics(data.metrics || {});
+    setEvents(data.recentEvents || []);
+    setExplanation({
+      title: data.latestExplanation?.title || 'Explanation unavailable',
+      body: data.latestExplanation?.body || 'No explanation has been generated yet.'
+    });
+    setLinkStates(data.link_states || []);
+    setRiskyLinks(data.riskyLinks || []);
+    setRiskSummary(data.riskSummary || { count: 0, level: 'low', message: 'No elevated-risk links detected.' });
+  }, []);
+
+  // Immediate on-demand refresh (called after actions)
+  const refreshNow = useCallback(async () => {
+    try {
+      const data = await fetchDashboard();
+      applyDashboardData(data);
+    } catch (err) {
+      console.error('Refresh failed:', err);
+    }
+  }, [applyDashboardData]);
+
   useEffect(() => {
     let interval;
     const loadState = async () => {
       try {
         const data = await fetchDashboard();
-        
-        setTopology({
-          type: data.topology?.topologyType || 'unknown',
-          switchCount: data.topology?.switchCount || 0,
-          hostsPerSwitch: data.topology?.hostsPerSwitch || 0,
-          estimatedLinks: data.topology?.estimatedLinks || 0,
-          status: data.topology?.runtimeStatus || (data.topology?.running ? 'running' : 'idle'),
-          running: data.topology?.running || false,
-          activePathStrategy: data.topology?.activePathStrategy || 'single-path',
-          graph: data.topology?.graph || { nodes: [], links: [] }
-        });
-        
-        setDashboard({ 
-          controllerStatus: data.controller?.status || 'offline',
-          controllerMode: data.controller?.mode || 'unknown',
-          recoveryStatus: data.recovery?.status || 'stable',
-          mockMode: false,
-          loadBalancingEnabled: data.features?.loadBalancingEnabled || false,
-          predictiveRecoveryEnabled: data.features?.predictiveRecoveryEnabled || false,
-          autoFailureEnabled: data.features?.autoFailureEnabled || false
-        });
-        
-        setMetrics(data.metrics || {});
-        setEvents(data.recentEvents || []);
-        
-        setExplanation({
-          title: data.latestExplanation?.title || 'Explanation unavailable',
-          body: data.latestExplanation?.body || 'No explanation has been generated yet.'
-        });
-
-        setLinkStates(data.link_states || []);
-        setRiskyLinks(data.riskyLinks || []);
-        setRiskSummary(data.riskSummary || { count: 0, level: 'low', message: 'No elevated-risk links detected.' });
-        
+        applyDashboardData(data);
       } catch (err) {
         console.error("Failed to fetch dashboard state", err);
       }
@@ -83,7 +92,7 @@ export function useDashboardState() {
     interval = setInterval(loadState, REFRESH_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [applyDashboardData]);
 
   const addEvent = useCallback((severity, message) => {
     // We just optimistically insert into UI state. 
@@ -115,18 +124,16 @@ export function useDashboardState() {
   const handleLaunchTopology = useCallback(async (type, switchCount, hostsPerSwitch) => {
     setTopology(prev => ({ ...prev, status: 'launching' }));
     try {
-      await launchTopology({
-        topologyType: type,
-        switchCount,
-        hostsPerSwitch
-      });
-      addEvent('info', 'Topology launch command sent successfully.');
+      await launchTopology({ topologyType: type, switchCount, hostsPerSwitch });
+      addEvent('info', `Launching ${type} topology with ${switchCount} switches…`);
+      // Refresh after a short delay to let backend update
+      setTimeout(refreshNow, 2000);
     } catch (err) {
       console.error(err);
       addEvent('error', 'Failed to launch topology: ' + err.message);
       setTopology(prev => ({ ...prev, status: 'error' }));
     }
-  }, [addEvent]);
+  }, [addEvent, refreshNow]);
 
   const handleStopTopology = useCallback(async () => {
     try {
@@ -183,33 +190,36 @@ export function useDashboardState() {
     try {
       await toggleLoadBalancingAPI(newVal);
       addEvent('info', `Adaptive Load Distribution ${newVal ? 'enabled' : 'disabled'}.`);
+      await refreshNow();
     } catch (err) {
       console.error(err);
-      addEvent('error', `Failed to toggle: ${err.message}`);
+      addEvent('error', `Failed to toggle load balancing: ${err.message}`);
     }
-  }, [dashboard.loadBalancingEnabled, addEvent]);
+  }, [dashboard.loadBalancingEnabled, addEvent, refreshNow]);
 
   const togglePredictiveRecovery = useCallback(async () => {
     const newVal = !dashboard.predictiveRecoveryEnabled;
     try {
       await togglePredictiveAnalyticsAPI(newVal);
-      addEvent('info', `Predictive Network Insights ${newVal ? 'enabled' : 'disabled'}.`);
+      addEvent('info', `Predictive Insights ${newVal ? 'enabled' : 'disabled'}.`);
+      await refreshNow();
     } catch (err) {
       console.error(err);
-      addEvent('error', `Failed to toggle: ${err.message}`);
+      addEvent('error', `Failed to toggle predictive insights: ${err.message}`);
     }
-  }, [dashboard.predictiveRecoveryEnabled, addEvent]);
+  }, [dashboard.predictiveRecoveryEnabled, addEvent, refreshNow]);
 
   const toggleAutoFailureMode = useCallback(async () => {
     const newVal = !dashboard.autoFailureEnabled;
     try {
       await toggleAutoFailureModeAPI(newVal);
-      addEvent('info', `Auto-Failure Mode ${newVal ? 'enabled' : 'disabled'}.`);
+      addEvent('info', `Auto-Failure Demo Mode ${newVal ? 'enabled' : 'disabled'}.`);
+      await refreshNow();
     } catch (err) {
       console.error(err);
-      addEvent('error', `Failed to toggle auto-failure: ${err.message}`);
+      addEvent('error', `Failed to toggle auto-failure mode: ${err.message}`);
     }
-  }, [dashboard.autoFailureEnabled, addEvent]);
+  }, [dashboard.autoFailureEnabled, addEvent, refreshNow]);
 
   return {
     state: {
