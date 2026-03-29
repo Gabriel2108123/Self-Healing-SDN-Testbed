@@ -1,15 +1,41 @@
 import logging
+import random
 from utils.validators import validate_topology_config
 
 logger = logging.getLogger(__name__)
 
 class TopologyService:
-    def __init__(self, mininet_service, metrics_service, event_service, explanation_service, dashboard_service):
+    def __init__(self, mininet_service, metrics_service, event_service, explanation_service, dashboard_service, link_state_service):
         self.mininet = mininet_service
         self.metrics = metrics_service
         self.events = event_service
         self.explanations = explanation_service
         self.dashboard = dashboard_service
+        self.link_state = link_state_service
+
+    def _build_switch_links(self, topology_type: str, switch_count: int):
+        links = []
+
+        if topology_type == "ring":
+            for i in range(1, switch_count + 1):
+                source = f"s{i}"
+                target = f"s{1 if i == switch_count else i + 1}"
+                links.append((source, target))
+
+        elif topology_type == "mesh":
+            for i in range(1, switch_count + 1):
+                for j in range(i + 1, switch_count + 1):
+                    links.append((f"s{i}", f"s{j}"))
+
+        return links
+
+    def _get_random_healthy_link(self):
+        healthy_links = self.link_state.get_healthy_links()
+
+        if not healthy_links:
+            return None
+
+        return random.choice(healthy_links)
 
     def create_topology(self, config: dict):
         is_valid, err_msg = validate_topology_config(config)
@@ -37,6 +63,10 @@ class TopologyService:
         switch_count = config.get("switchCount")
         hosts_per_switch = config.get("hostsPerSwitch", 1)
 
+        self.link_state.reset()
+        topology_links = self._build_switch_links(topology_type, switch_count)
+        self.link_state.register_links_from_pairs(topology_links)
+
         if topology_type == "ring":
             success, msg = self.mininet.create_ring_topology(switch_count, hosts_per_switch)
         elif topology_type == "mesh":
@@ -57,6 +87,83 @@ class TopologyService:
         self.dashboard.set_runtime_status("error")
         self.events.add_event("error", "error", f"Topology launch failed: {msg}")
         return False, msg
+
+    def simulate_random_link_failure(self):
+        if not self.dashboard.running:
+            return False, "No running topology available."
+
+        selected_link = self._get_random_healthy_link()
+        if not selected_link:
+            return False, "No healthy links available to fail."
+
+        source = selected_link["source"]
+        target = selected_link["target"]
+
+        marked = self.link_state.mark_failed(source, target)
+        if not marked:
+            return False, f"Failed to mark link {source}-{target} as failed."
+
+        failed_links = self.link_state.get_failed_links()
+        self.dashboard.set_failed_links(failed_links)
+
+        self.events.add_event(
+            "warning",
+            "warning",
+            f"Random link failure simulated on {source}-{target}"
+        )
+
+        self.metrics.increment_detected_failures()
+        self.metrics.record_failure_detection_time(120)
+        self.metrics.set_prediction("medium", f"Failure detected on {source}-{target}.")
+
+        return True, {
+            "failedLink": {
+                "source": source,
+                "target": target
+            },
+            "failedLinks": failed_links
+        }
+
+    def recover_one_failed_link(self):
+        if not self.dashboard.running:
+            return False, "No running topology available."
+
+        failed_links = self.link_state.get_failed_links()
+        if not failed_links:
+            return False, "No failed links available to recover."
+
+        link = failed_links[0]
+        source = link["source"]
+        target = link["target"]
+
+        recovered = self.link_state.mark_recovered(source, target)
+        if not recovered:
+            return False, f"Failed to recover link {source}-{target}."
+
+        remaining_failed_links = self.link_state.get_failed_links()
+        self.dashboard.set_failed_links(remaining_failed_links)
+
+        self.events.add_event(
+            "success",
+            "success",
+            f"Link recovered on {source}-{target}"
+        )
+
+        self.metrics.increment_successful_recoveries()
+        self.metrics.record_recovery_time(200)
+
+        if remaining_failed_links:
+            self.metrics.set_prediction("medium", "Some failed links still remain.")
+        else:
+            self.metrics.set_prediction("low", "No immediate instability predicted.")
+
+        return True, {
+            "recoveredLink": {
+                "source": source,
+                "target": target
+            },
+            "failedLinks": remaining_failed_links
+        }
 
     def reset_topology(self):
         if not self.dashboard.running:

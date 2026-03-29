@@ -42,6 +42,22 @@ def simulate_failure():
     else:
         return error_response(msg)
 
+@topology_bp.route('/api/topology/simulate-random-failure', methods=['POST'])
+def simulate_random_failure():
+    success, result = topology_service.simulate_random_link_failure()
+    if success:
+        return jsonify(success_response("Random link failure simulated successfully.", result))
+    else:
+        return error_response(result)
+
+@topology_bp.route('/api/topology/recover-link', methods=['POST'])
+def recover_link():
+    success, result = topology_service.recover_one_failed_link()
+    if success:
+        return jsonify(success_response("Link recovered successfully.", result))
+    else:
+        return error_response(result)
+
 @topology_bp.route('/api/features/load-balancing', methods=['POST'])
 def toggle_load_balancing():
     payload = request.get_json() or {}

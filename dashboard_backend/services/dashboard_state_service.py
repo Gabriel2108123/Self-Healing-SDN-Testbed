@@ -1,11 +1,13 @@
 from utils.topology_helpers import estimate_link_count
+from services.link_state_service import LinkStateService
 
 class DashboardStateService:
-    def __init__(self, metrics_service, event_service, explanation_service, controller_service):
+    def __init__(self, metrics_service, event_service, explanation_service, controller_service, link_state_service):
         self.metrics_service = metrics_service
         self.event_service = event_service
         self.explanation_service = explanation_service
         self.controller_service = controller_service
+        self.link_state_service = link_state_service
         self.failed_links = []
         self.active_path_strategy = "single-path"
         
@@ -116,6 +118,31 @@ class DashboardStateService:
             "links": links
         }
 
+    def _build_risk_summary(self):
+        risky_links = self.link_state_service.get_risky_links()
+
+        if not risky_links:
+            return {
+                "level": "low",
+                "message": "No elevated-risk links detected.",
+                "count": 0
+            }
+
+        high_risk_count = len([link for link in risky_links if link["risk_score"] >= 50.0])
+
+        if high_risk_count > 0:
+            return {
+                "level": "high",
+                "message": f"{high_risk_count} high-risk link(s) detected.",
+                "count": len(risky_links)
+            }
+
+        return {
+            "level": "medium",
+            "message": f"{len(risky_links)} elevated-risk link(s) detected.",
+            "count": len(risky_links)
+        }
+
     def get_dashboard_summary(self):
         """Assembles a full snapshot of the system for the UI base dashboard route."""
         topo = {
@@ -147,6 +174,9 @@ class DashboardStateService:
                 topo["hostsPerSwitch"]
             )
 
+        risky_links = self.link_state_service.get_risky_links()
+        risk_summary = self._build_risk_summary()
+
         return {
             "topology": topo,
             "controller": {
@@ -159,6 +189,9 @@ class DashboardStateService:
             },
             "features": self.feature_flags,
             "latestExplanation": self.explanation_service.get_latest_explanation(),
-            "recentEvents": self.event_service.get_recent_events()
+            "recentEvents": self.event_service.get_recent_events(),
+            "link_states": self.link_state_service.get_all_links(),
+            "riskyLinks": risky_links,
+            "riskSummary": risk_summary
         }
 

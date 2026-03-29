@@ -37,12 +37,12 @@ class MininetService:
         logger.info("Cleaning up stale Mininet state")
 
         commands = [
-            "sudo mn -c",
-            "sudo pkill -f mininet",
-            "sudo pkill -f ovs-controller",
-            "sudo pkill -f ofdatapath",
-	    "sudo pkill -f network_topology.py",
-         ]
+            "sudo -n mn -c",
+            "sudo -n pkill -f mininet",
+            "sudo -n pkill -f ovs-controller",
+            "sudo -n pkill -f ofdatapath",
+            "sudo -n pkill -f network_topology.py",
+        ]
 
         for cmd in commands:
             try:
@@ -57,7 +57,6 @@ class MininetService:
         args = [
             "sudo",
             "-n",
-            "-E",
             "python3",
             str(self.shared_topology_script),
             str(topology_name),
