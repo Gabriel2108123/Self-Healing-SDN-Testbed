@@ -98,8 +98,12 @@ def toggle_auto_failure_mode():
 
     dashboard_state_service.set_auto_failure_mode(enabled)
 
+    if enabled:
+        topology_service.start_auto_failure_loop()
+    else:
+        topology_service.stop_auto_failure_loop()
+
     return jsonify(success_response(
         f"Auto-failure mode {'enabled' if enabled else 'disabled'}.",
         {"autoFailureEnabled": enabled}
     ))
-

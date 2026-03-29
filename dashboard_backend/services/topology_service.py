@@ -1,5 +1,7 @@
 import logging
 import random
+import threading
+import time
 from utils.validators import validate_topology_config
 
 logger = logging.getLogger(__name__)
@@ -12,6 +14,8 @@ class TopologyService:
         self.explanations = explanation_service
         self.dashboard = dashboard_service
         self.link_state = link_state_service
+        self.auto_failure_thread = None
+        self.auto_failure_stop_event = threading.Event()
 
     def _build_switch_links(self, topology_type: str, switch_count: int):
         links = []
@@ -36,6 +40,43 @@ class TopologyService:
             return None
 
         return random.choice(healthy_links)
+
+    def _auto_failure_worker(self):
+        while not self.auto_failure_stop_event.is_set():
+            time.sleep(8)
+
+            if self.auto_failure_stop_event.is_set():
+                break
+
+            if not self.dashboard.auto_failure_enabled:
+                continue
+
+            if not self.dashboard.running:
+                continue
+
+            failed_links = self.link_state.get_failed_links()
+
+            try:
+                if failed_links:
+                    self.recover_one_failed_link()
+                else:
+                    self.simulate_random_link_failure()
+            except Exception as exc:
+                logger.warning("Auto-failure worker iteration failed: %s", exc)
+
+    def start_auto_failure_loop(self):
+        if self.auto_failure_thread and self.auto_failure_thread.is_alive():
+            return
+
+        self.auto_failure_stop_event.clear()
+        self.auto_failure_thread = threading.Thread(
+            target=self._auto_failure_worker,
+            daemon=True
+        )
+        self.auto_failure_thread.start()
+
+    def stop_auto_failure_loop(self):
+        self.auto_failure_stop_event.set()
 
     def create_topology(self, config: dict):
         is_valid, err_msg = validate_topology_config(config)
@@ -82,6 +123,7 @@ class TopologyService:
             self.metrics.set_prediction("low", "No immediate instability predicted.")
             event = self.events.add_event("success", "success", "Topology launched successfully")
             self.explanations.explain_topology_created(config, event_id=event["id"])
+            self.start_auto_failure_loop()
             return True, msg
 
         self.dashboard.set_runtime_status("error")
@@ -205,7 +247,7 @@ class TopologyService:
 
     def stop_topology(self):
         success, msg = self.mininet.stop_topology()
-
+        self.stop_auto_failure_loop()
 
         if success:
             self.dashboard.current_topology_config = None
